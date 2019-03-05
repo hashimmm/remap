@@ -4,6 +4,9 @@
 ;; such that relations are collected so that a one
 ;; to many join doesn't mess up the row count.
 
+;; Designed to work with the shape of results provided
+;; by the db pkg/collection.
+
 ;; Basically we use the fact that the ordering of
 ;; groupings and selrefs is the same as selectables
 ;; and result columns.
@@ -50,7 +53,7 @@
              Any)))
 
 (define-type GroupedRow
-  (Row GroupedRowItem))
+  (Record GroupedRowItem))
 
 (define-type UnwrappedGroupedRow
   (Listof GroupedRowItem))
@@ -66,10 +69,17 @@
          (merge-rows
           (expand-rows groupings sel-ref-map results))]))
 
+(: group-query-result (-> (U PreparedQuery Query) Results GroupedResults))
+(define (group-query-result pq-or-q res)
+  (define pq (if (PreparedQuery? pq-or-q) pq-or-q (prepare-query pq-or-q)))
+  (group-rows (PreparedQuery-groupings pq)
+              (PreparedQuery-sel-refs-map pq)
+              res))
+
 (: expand-rows (-> Groupings SelectableNameMap Results GroupedResults))
 (define (expand-rows groupings sel-ref-map results)
   (map (λ([row-vec : (Vectorof Any)]) : GroupedRow
-         (Row
+         (Record
           ((inst map
                  GroupedRowItem
                  Any
@@ -102,7 +112,7 @@
          (cons ref x)]
         [(OneToOneRel? (first rels))
          (cons ref
-               (Row
+               (Record
                 (list
                  (expand-item x
                               (cons sel (rest rels))
@@ -110,7 +120,7 @@
         [else
          (cons ref
                (list
-                (Row
+                (Record
                  (list
                   (expand-item x
                                (cons sel (rest rels))
@@ -123,11 +133,11 @@
       ([so-far : GroupedResults '()])
       ([current-row : GroupedRow (in-list expanded-rows)])
       (define record
-        (Row
+        (Record
          (reverse
           (for/fold : UnwrappedGroupedRow
             ([horizontally-merged : UnwrappedGroupedRow '()])
-            ([current-item : GroupedRowItem (in-list (Row-val current-row))])
+            ([current-item : GroupedRowItem (in-list (Record-val current-row))])
             (maybe-merge-items horizontally-merged current-item)))))
       (maybe-merge-rows so-far record)))
   (reverse res))
@@ -147,13 +157,13 @@
          (define rest-row (rest row-so-far))
          (cond [(not (equal? last-ref current-ref))
                 (cons current-item row-so-far)]
-               [(and (Row? last-val) (Row? current-val))
-                (let ([current-sub-val (Row-val current-val)]
-                      [last-sub-val (Row-val last-val)])
+               [(and (Record? last-val) (Record? current-val))
+                (let ([current-sub-val (Record-val current-val)]
+                      [last-sub-val (Record-val last-val)])
                   ((inst cons GroupedRowItem)
                    ((inst cons Symbol GroupedRow)
                     last-ref
-                    (Row
+                    (Record
                      (maybe-merge-items last-sub-val
                                         (first current-sub-val))))
                    rest-row))]
@@ -162,9 +172,9 @@
                  ((inst cons Symbol GroupedResults)
                   last-ref
                   (list
-                   (Row
-                    (maybe-merge-items (Row-val (first last-val))
-                                       (first (Row-val (first current-val)))))))
+                   (Record
+                    (maybe-merge-items (Record-val (first last-val))
+                                       (first (Record-val (first current-val)))))))
                  rest-row)]
                [else
                 (cons current-item row-so-far)])]))
@@ -177,12 +187,12 @@
             (define val2 (cdr item2))
             (cond [(list? val1)
                    #t]
-                  [(and (Row? val1) (Row? val2))
+                  [(and (Record? val1) (Record? val2))
                    (check-record-equal? val1 val2)]
                   [else
                    (equal? val1 val2)]))
-          (Row-val row1)
-          (Row-val row2)))
+          (Record-val row1)
+          (Record-val row2)))
 
 (: maybe-merge-rows (-> GroupedResults
                         GroupedRow
@@ -198,7 +208,7 @@
 
 (: merge-records (-> GroupedRow GroupedRow GroupedRow))
 (define (merge-records row1 row2)
-  ((inst Row GroupedRowItem)
+  ((inst Record GroupedRowItem)
    ((inst map GroupedRowItem GroupedRowItem GroupedRowItem)
     (λ([item1 : GroupedRowItem]
        [item2 : GroupedRowItem])
@@ -216,5 +226,5 @@
                      val2)))]
             [else
              item1]))
-    (Row-val row1)
-    (Row-val row2))))
+    (Record-val row1)
+    (Record-val row2))))

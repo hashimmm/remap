@@ -55,7 +55,7 @@
 
 ;; Turns out this is almost the same as assoc (facepalm)
 ;; and I could've used dict-ref (but assoc is typed, so better)
-(: alist-ref (All (A B) (-> (U (Listof (Pairof A B)) (Row (Pairof A B)))
+(: alist-ref (All (A B) (-> (U (Listof (Pairof A B)) (Record (Pairof A B)))
                             A
                             B)))
 (define (alist-ref mapping key)
@@ -63,7 +63,7 @@
       ([found
         (findf (λ([x : (Pairof A B)])
                  (equal? key ((inst car A B) x)))
-               (if (list? mapping) mapping (Row-val mapping)))])
+               (if (list? mapping) mapping (Record-val mapping)))])
     (if found
         ((inst cdr A B) found)
         (raise-arguments-error
@@ -89,14 +89,14 @@
                (alist-update (rest mapping) key updater fallback))]))
 
 (: alist-row-update (All (A B)
-                         (-> (Row (Pairof A B))
+                         (-> (Record (Pairof A B))
                              A
                              (-> B B)
                              B
-                             (Row (Pairof A B)))))
+                             (Record (Pairof A B)))))
 (define (alist-row-update row key updater fallback)
-  (Row
-   (let ([mapping (Row-val row)])
+  (Record
+   (let ([mapping (Record-val row)])
      (cond [(null? mapping)
             (list (cons key (updater fallback)))]
            [(equal? (car (first mapping)) key)
@@ -117,31 +117,31 @@
        mapping))
 
 (: alist-row-map-values (All (A B C)
-                             (-> (Row (Pairof A B))
+                             (-> (Record (Pairof A B))
                                  (-> B C)
-                                 (Row (Pairof A C)))))
+                                 (Record (Pairof A C)))))
 (define (alist-row-map-values row fun)
-  (Row
+  (Record
    (map (λ([k-v : (Pairof A B)])
           (cons (car k-v)
                 (fun (cdr k-v))))
-        (Row-val row))))
+        (Record-val row))))
 
 ;; This guy's purpose is to save us from the issue of pairs and lists.
 ;; Vectors are painful too, but we may switch to them for performance later.
-(struct (A) Row ([val : (Listof A)]) #:transparent)
+(struct (A) Record ([val : (Listof A)]) #:transparent)
 
-(: row-map (All (A B) (-> (-> A B) (Row A) (Row B))))
+(: row-map (All (A B) (-> (-> A B) (Record A) (Record B))))
 (define (row-map fun row)
-  (Row (map fun (Row-val row))))
+  (Record (map fun (Record-val row))))
 
-(: row-map2 (All (A B C) (-> (-> A B C) (Row A) (Row B) (Row C))))
+(: row-map2 (All (A B C) (-> (-> A B C) (Record A) (Record B) (Record C))))
 (define (row-map2 fun row row2)
-  (Row (map fun (Row-val row) (Row-val row2))))
+  (Record (map fun (Record-val row) (Record-val row2))))
 
-(: row-append (All (A) (-> (Row A) (Row A) (Row A))))
+(: row-append (All (A) (-> (Record A) (Record A) (Record A))))
 (define (row-append row1 row2)
-  (Row (append (Row-val row1) (Row-val row2))))
+  (Record (append (Record-val row1) (Record-val row2))))
 
 (: my-partition
    (All (a b c)
@@ -159,20 +159,20 @@
         (values tru (cons x fal)))))
 
 (: make-groups (All (A B)
-                    (-> (Row A)
+                    (-> (Record A)
                         (-> A B)
-                        (Listof (Pairof B (Row A))))))
+                        (Listof (Pairof B (Record A))))))
 (define (make-groups lst grouper)
-  (for/fold : (Listof (Pairof B (Row A)))
-              ([collected : (Listof (Pairof B (Row A))) '()])
-              ([val : A (in-list (Row-val lst))])
+  (for/fold : (Listof (Pairof B (Record A)))
+              ([collected : (Listof (Pairof B (Record A))) '()])
+              ([val : A (in-list (Record-val lst))])
     (define belongs-to-group (grouper val))
     (alist-update collected
                   belongs-to-group
-                  (λ([x : (Row A)])
+                  (λ([x : (Record A)])
                     (row-cons val x))
-                  (Row '()))))
+                  (Record '()))))
 
-(: row-cons (All (A) (-> A (U (Listof A) (Row A)) (Row A))))
+(: row-cons (All (A) (-> A (U (Listof A) (Record A)) (Record A))))
 (define (row-cons val row)
-  (Row (cons val (if (list? row) row (Row-val row)))))
+  (Record (cons val (if (list? row) row (Record-val row)))))

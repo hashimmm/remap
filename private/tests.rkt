@@ -230,70 +230,70 @@ EOF
   (check-equal?
    (name-pq-results prep-q results-sel-t5-with-t4-and-t4-set)
    (list
-    (Row
+    (Record
      (list
       '(id . 1)
-      (cons 't4 (Row '((t4:id . "t4-1"))))
+      (cons 't4 (Record '((t4:id . "t4-1"))))
       (list
        't4-set
-       (Row '((t4-set:id . "t4-set-3")))
-       (Row '((t4-set:id . "t4-set-2")))
-       (Row '((t4-set:id . "t4-set-1"))))))
-    (Row
+       (Record '((t4-set:id . "t4-set-3")))
+       (Record '((t4-set:id . "t4-set-2")))
+       (Record '((t4-set:id . "t4-set-1"))))))
+    (Record
      (list
       '(id . 2)
-      (cons 't4 (Row '((t4:id . "t4-2"))))
+      (cons 't4 (Record '((t4:id . "t4-2"))))
       (list
        't4-set
-       (Row '((t4-set:id . "t4-set-2")))
-       (Row '((t4-set:id . "t4-set-1"))))))
-    (Row
+       (Record '((t4-set:id . "t4-set-2")))
+       (Record '((t4-set:id . "t4-set-1"))))))
+    (Record
      (list
       '(id . 3)
-      (cons 't4 (Row '((t4:id . "t4-3"))))
+      (cons 't4 (Record '((t4:id . "t4-3"))))
       (list
        't4-set
-       (Row '((t4-set:id . "t4-set-5")))
-       (Row '((t4-set:id . "t4-set-4"))))))
-    (Row
+       (Record '((t4-set:id . "t4-set-5")))
+       (Record '((t4-set:id . "t4-set-4"))))))
+    (Record
      (list
       '(id . 4)
-      (cons 't4 (Row '((t4:id . "t4-3"))))
-      (list 't4-set (Row '((t4-set:id . "t4-set-5"))))))))
+      (cons 't4 (Record '((t4:id . "t4-3"))))
+      (list 't4-set (Record '((t4-set:id . "t4-set-5"))))))))
   (check-equal?
    (gv2:group-rows (PreparedQuery-groupings prep-q)
                    (PreparedQuery-sel-refs-map prep-q)
                    results-sel-t5-with-t4-and-t4-set)
    (list
-    (Row
+    (Record
      (list
       (list
        't4-set
-       (Row '((id . "t4-set-1")))
-       (Row '((id . "t4-set-2")))
-       (Row '((id . "t4-set-3"))))
-      (cons 't4 (Row '((id . "t4-1"))))
+       (Record '((id . "t4-set-1")))
+       (Record '((id . "t4-set-2")))
+       (Record '((id . "t4-set-3"))))
+      (cons 't4 (Record '((id . "t4-1"))))
       '(id . 1)))
-    (Row
+    (Record
      (list
       (list
        't4-set
-       (Row '((id . "t4-set-1")))
-       (Row '((id . "t4-set-2"))))
-      (cons 't4 (Row '((id . "t4-2"))))
+       (Record '((id . "t4-set-1")))
+       (Record '((id . "t4-set-2"))))
+      (cons 't4 (Record '((id . "t4-2"))))
       '(id . 2)))
-    (Row
+    (Record
      (list
       (list
        't4-set
-       (Row '((id . "t4-set-4")))
-       (Row '((id . "t4-set-5"))))
-      (cons 't4 (Row '((id . "t4-3"))))
+       (Record '((id . "t4-set-4")))
+       (Record '((id . "t4-set-5"))))
+      (cons 't4 (Record '((id . "t4-3"))))
       '(id . 3)))
-    (Row
+    (Record
      (list
-      (list 't4-set (Row '((id . "t4-set-5"))))
-      (cons 't4 (Row '((id . "t4-3"))))
+      (list 't4-set (Record '((id . "t4-set-5"))))
+      (cons 't4 (Record '((id . "t4-3"))))
       '(id . 4)))))
 
   (define stuff-tbl
@@ -413,6 +413,49 @@ EOF
       #("111244622" 4 "otherbody" 12 "foo" 12 2)
       #("111532532" 2 "somebody" 12 "foo" 12 2)))
 
-  (gv2:group-rows (PreparedQuery-groupings 1-N-N-prep-query)
-                  (PreparedQuery-sel-refs-map 1-N-N-prep-query)
-                  1-N-N-results))
+  (check-equal?
+   (gv2:group-rows (PreparedQuery-groupings 1-N-N-prep-query)
+                   (PreparedQuery-sel-refs-map 1-N-N-prep-query)
+                   1-N-N-results)
+   (list
+ (Record
+  (list
+   (list
+    'users
+    (Record
+     (list
+      '(name . "somebody")
+      (list
+       'phone-numbers
+       (Record '((id . 1) (number . "090078601")))
+       (Record '((id . 2) (number . "111532532"))))))
+    (Record
+     (list
+      '(name . "otherbody")
+      (list
+       'phone-numbers
+       (Record '((id . 3) (number . "111241241")))))))
+   (cons 'parent (Record '((id . 11))))
+   '(name . "thing")
+   '(parent-id . 11)
+   '(id . 1)))
+ (Record
+  (list
+   (list
+    'users
+    (Record
+     (list
+      '(name . "otherbody")
+      (list
+       'phone-numbers
+       (Record '((id . 4) (number . "111244622"))))))
+    (Record
+     (list
+      '(name . "somebody")
+      (list
+       'phone-numbers
+       (Record '((id . 2) (number . "111532532")))))))
+   (cons 'parent (Record '((id . 12))))
+   '(name . "foo")
+   '(parent-id . 12)
+   '(id . 2))))))

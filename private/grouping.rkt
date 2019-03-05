@@ -21,7 +21,7 @@
   (define rendered-stmt (to-sql prep-q))
   (values rendered-stmt (PreparedQuery-groupings prep-q)))
 
-(define-type TaggedResults (Listof (Row (Pairof Selectable Any))))
+(define-type TaggedResults (Listof (Record (Pairof Selectable Any))))
 (define-type Results (Listof (Vectorof Any)))
 
 (: tag-results (-> Results (Listof Selectable) TaggedResults))
@@ -34,7 +34,7 @@
               "Result vectors must be of same length as columns."
               "row-list" row-list
               "cols" cols))
-           (Row
+           (Record
             (map (λ([item : Any] [tag : Selectable])
                    (cons tag item))
                  row-list
@@ -50,9 +50,9 @@
 ;; offset the advantages we give the user. But only usage will tell.
 
 (define-type GroupedRow
-  (Row (U (Pairof Selectable Any)
+  (Record (U (Pairof Selectable Any)
           (Pairof (Listof Relation)
-                  (Row (Pairof Selectable Any)))
+                  (Record (Pairof Selectable Any)))
           (Pairof (Listof Relation)
                   GroupedResults))))
 (define-type GroupedResults
@@ -96,7 +96,7 @@
                        [y : (Pairof Selectable (Listof Relation))])
                       (< (length (drop-1-1s (cdr x)))
                          (length (drop-1-1s (cdr y)))))))
-  (: extract-col-values (-> (Row (Pairof Selectable Any))
+  (: extract-col-values (-> (Record (Pairof Selectable Any))
                             (Listof Selectable)
                             (Listof Any)))
   (define (extract-col-values row cols)
@@ -123,7 +123,7 @@
                 [(matching-set non-matching)
                  (splitf-at
                   rows
-                  (λ([row : (Row (Pairof Selectable Any))])
+                  (λ([row : (Record (Pairof Selectable Any))])
                     (let ([relevant-values
                            (extract-col-values row static-cols)])
                       (andmap equal? relevant-values static-vals))))])
@@ -152,11 +152,11 @@
       (for/fold : (Values
                    (Listof (Pairof Selectable Any))
                    (Listof 
-                    (Pairof (Listof Relation) (Row (Pairof Selectable Any)))))
+                    (Pairof (Listof Relation) (Record (Pairof Selectable Any)))))
         ([collected-simple : (Listof (Pairof Selectable Any))
                            '()]
          [collected-1-1 : (Listof 
-                           (Pairof (Listof Relation) (Row (Pairof Selectable Any))))
+                           (Pairof (Listof Relation) (Record (Pairof Selectable Any))))
                         '()])
         ([sel-n-val (in-list row-statics)])
         (define sel (car sel-n-val))
@@ -167,14 +167,14 @@
               [else
                (values
                 collected-simple
-                ((inst alist-update (Listof Relation) (Row (Pairof Selectable Any)))
+                ((inst alist-update (Listof Relation) (Record (Pairof Selectable Any)))
                  collected-1-1
                  matching-rel
-                 (λ([sel-n-vals : (Row (Pairof Selectable Any))])
+                 (λ([sel-n-vals : (Record (Pairof Selectable Any))])
                    (row-cons sel-n-val sel-n-vals))
-                 (Row '())))])))
+                 (Record '())))])))
     (define normalized-row-statics
-      (Row (append row-simple row-1-1)))
+      (Record (append row-simple row-1-1)))
     (cond [(null? remaining-groups)
            normalized-row-statics]
           [else
@@ -222,15 +222,15 @@
            (define rows-by-prefix
              (for/fold : (Listof (Pairof (Listof Relation) TaggedResults))
                ([collected : (Listof (Pairof (Listof Relation) TaggedResults)) '()])
-               ([row : (Row (Pairof Selectable Any)) (in-list matching-set)])
+               ([row : (Record (Pairof Selectable Any)) (in-list matching-set)])
                (define partitioned-row
-                 (make-groups (Row (filter (λ([sel-n-val : (Pairof Selectable Any)])
+                 (make-groups (Record (filter (λ([sel-n-val : (Pairof Selectable Any)])
                                              (not (member (car sel-n-val) static-cols)))
-                                           (Row-val row)))
+                                           (Record-val row)))
                               (λ([sel-n-val : (Pairof Selectable Any)])
                                 (alist-ref sel-and-new-prefix (car sel-n-val)))))
                (foldl (λ([pref-n-row-part : (Pairof (Listof Relation)
-                                                    (Row (Pairof Selectable Any)))]
+                                                    (Record (Pairof Selectable Any)))]
                          [last-collected : (Listof (Pairof (Listof Relation) TaggedResults))])
                         (alist-update last-collected
                                       (car pref-n-row-part)
@@ -261,16 +261,16 @@
                              (grouper (second pref-n-res-n-groups)
                                       (third pref-n-res-n-groups))])
                         (if (and (equal? (length group-res) 1) (andmap sql-null?
-                                                                       (Row-val (first group-res))))
+                                                                       (Record-val (first group-res))))
                             '()
                             group-res))))
               grouper-args))
            ((inst row-append (U (Pairof Selectable Any)
                                 (Pairof (Listof Relation)
-                                        (Row (Pairof Selectable Any)))
+                                        (Record (Pairof Selectable Any)))
                                 (Pairof (Listof Relation)
                                         GroupedResults)))
-            normalized-row-statics (Row grouping-results))]))
+            normalized-row-statics (Record grouping-results))]))
   (grouper all-rows sorted-groupings))
 
 (: group-results (-> Results Groupings GroupedResults))
@@ -285,25 +285,25 @@
 ;; The "A" is for Symbol or String but otherwise this has to be
 ;; the same as GroupedRow/GroupedResults
 (define-type NamedRow (All (A)
-                           (Row (U (Pairof A Any)
-                                   (Pairof A (Row (Pairof A Any)))
+                           (Record (U (Pairof A Any)
+                                   (Pairof A (Record (Pairof A Any)))
                                    (Pairof A NamedResults)))))
 (define-type (NamedResults A) (Listof (NamedRow A)))
 
 (: name-row (-> GroupedRow SelectableNameMap (NamedRow Symbol)))
 (define (name-row row sel-ref-map)
-  (Row
+  (Record
    (for/list : (Listof (U (Pairof Symbol Any)
-                          (Pairof Symbol (Row (Pairof Symbol Any)))
+                          (Pairof Symbol (Record (Pairof Symbol Any)))
                           (Pairof Symbol (NamedResults Symbol))))
-     ([val-pair (in-list (Row-val row))])
+     ([val-pair (in-list (Record-val row))])
      (let ([key (car val-pair)]
            [val (cdr val-pair)])
        (cond [(list? key) ;; listof relation, val is a listof rows or listof row
               (cons (string->symbol (rel-path->name key))
                     (cond [(null? val)
                            (ann '() (NamedResults Symbol))]
-                          [(Row? val)
+                          [(Record? val)
                            (name-row val sel-ref-map)]
                           [else
                            (name-grouped-results val sel-ref-map)]))]
