@@ -2,7 +2,8 @@
 (define collection "remap")
 (define deps '("base"
                "db-lib"
-               "typed-racket-lib"))
+               "typed-racket-lib"
+               "typed-racket-more"))
 (define build-deps '("scribble-lib"
                      "racket-doc"
                      "rackunit-typed"))
