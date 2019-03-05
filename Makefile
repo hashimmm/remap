@@ -29,7 +29,7 @@ clean:
 # does the equivalent of make setup, this tries to do as little as
 # possible except checking deps.
 check-deps:
-	raco setup --no-docs $(PACKAGE-NAME)
+	raco setup $(DEPS-FLAGS) --no-docs $(PACKAGE-NAME)
 
 # Suitable for both day-to-day dev and CI
 test:
