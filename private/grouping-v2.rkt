@@ -228,3 +228,38 @@
              item1]))
     (Record-val row1)
     (Record-val row2))))
+
+(define-type HashRowVal
+  (U HashRow  ;; Row?
+     HashResults  ;; List?
+     Any))
+
+(define-type HashRow
+  (HashTable Symbol HashRowVal))
+
+(define-type HashResults
+  (Listof HashRow))
+
+(: grouped-results->hash-results
+   (-> GroupedResults
+       HashResults))
+(define (grouped-results->hash-results g-res)
+  (map hash-row g-res))
+
+(: hash-row (-> GroupedRow HashRow))
+(define (hash-row g-row)
+  ((inst foldl GroupedRowItem HashRow)
+   (λ([p : GroupedRowItem]
+      [so-far : HashRow]) : HashRow
+     (let* ([ref (car p)]
+            [val (cdr p)]
+            [processed-val
+             (cond [(Record? val)
+                    (hash-row val)]
+                   [(list? val)
+                    (grouped-results->hash-results val)]
+                   [else
+                    val])])
+       (hash-set so-far ref processed-val)))
+   #{(hash) : HashRow}
+   (Record-val g-row)))
