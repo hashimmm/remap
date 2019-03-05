@@ -407,7 +407,7 @@ LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
 EOF
    )
 
-  (: 1-N-N-results gv2:RawResults)
+  (: 1-N-N-results gv2:Results)
   (define 1-N-N-results
     `(#("090078601" 1 "somebody" 11 "thing" 11 1)
       #("111532532" 2 "somebody" 11 "thing" 11 1)
@@ -463,8 +463,8 @@ EOF
       '(parent-id . 12)
       '(id . 2)))
     (Record
-    '((users)
-      (parent . #s(LocalSQLNull))
+    `((users)
+      (parent . ,sql-null)
       (name . "foo")
-      (parent-id . #s(LocalSQLNull))
+      (parent-id . ,sql-null)
       (id . 2))))))

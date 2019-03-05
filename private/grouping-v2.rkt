@@ -37,7 +37,8 @@
          racket/string
          "query.rkt"
          "tables.rkt"
-         "utils.rkt")
+         "utils.rkt"
+         (only-in typed/db sql-null SQL-Null sql-null?))
 
 (require/typed db
                [#:struct sql-timestamp
@@ -48,8 +49,7 @@
                  [minute : Exact-Nonnegative-Integer]
                  [second : Exact-Nonnegative-Integer]
                  [nanosecond : Exact-Nonnegative-Integer]
-                 [tz : (U Integer False)])]
-               [sql-null? (-> Any Boolean)])
+                 [tz : (U Integer False)])])
 #|
 (require/typed db
                [#:opaque SqlNull sql-null?]
@@ -68,8 +68,6 @@
                [#:opaque PGisPolygon polygon?])
 |#
 
-(struct LocalSQLNull () #:prefab)
-
 (define-type AnyVal
   (U String
      Number
@@ -77,9 +75,8 @@
      Char
      Bytes
      sql-timestamp
-     LocalSQLNull
-     #|SQL-Null
-     SqlDate
+     SQL-Null
+     #|SqlDate
      SqlTime
      SqlInterval
      PGRange
@@ -90,17 +87,17 @@
      PGisPolygon
      PGisCircle|#))
 
-(define-type RawResults (Listof (Vectorof Any)))
+#;(define-type RawResults (Listof (Vectorof Any)))
 
 (define-type ResultRow (Vectorof AnyVal))
 (define-type Results (Listof ResultRow))
 
-(: pre-process-results (-> RawResults Results))
-(define (pre-process-results raw-res)
+#;(: pre-process-results (-> RawResults Results))
+#;(define (pre-process-results raw-res)
   (map (λ([row-vec : (Vectorof Any)])
          (vector-map (λ([val : Any])
                        (cond [(sql-null? val)
-                              (LocalSQLNull)]
+                              val]
                              [else
                               (cast val AnyVal)]))
                      row-vec))
@@ -121,9 +118,9 @@
 (define-type GroupedResults
   (Listof GroupedRow))
 
-(: group-rows (-> Groupings SelectableNameMap RawResults GroupedResults))
-(define (group-rows groupings sel-ref-map raw-results)
-  (define results (pre-process-results raw-results))
+(: group-rows (-> Groupings SelectableNameMap Results GroupedResults))
+(define (group-rows groupings sel-ref-map results)
+  #;(define results (pre-process-results raw-results))
   (cond [(null? results)
          results]
         [else
@@ -131,7 +128,7 @@
           (merge-rows
            (expand-rows groupings sel-ref-map results)))]))
 
-(: group-query-result (-> (U PreparedQuery Query) RawResults GroupedResults))
+(: group-query-result (-> (U PreparedQuery Query) Results GroupedResults))
 (define (group-query-result pq-or-q res)
   (define pq (if (PreparedQuery? pq-or-q) pq-or-q (prepare-query pq-or-q)))
   (group-rows (PreparedQuery-groupings pq)
@@ -219,6 +216,8 @@
          (define rest-row (rest row-so-far))
          (cond [(not (equal? last-ref current-ref))
                 (cons current-item row-so-far)]
+               [(or (sql-null? last-val) (sql-null? current-val))
+                (cons current-item row-so-far)]
                [(and (Record? last-val) (Record? current-val))
                 (let ([current-sub-val (Record-val current-val)]
                       [last-sub-val (Record-val last-val)])
@@ -247,7 +246,9 @@
              [item2 : GroupedRowItem])
             (define val1 (cdr item1))
             (define val2 (cdr item2))
-            (cond [(list? val1)
+            (cond [(or (sql-null? val1) (sql-null? val2))
+                   (eq? val1 val2)]
+                  [(list? val1)
                    #t]
                   [(and (Record? val1) (Record? val2))
                    (check-record-equal? val1 val2)]
@@ -277,7 +278,10 @@
       (define val1 (cdr item1))
       (define val2 (cdr item2))
       (define ref (car item1))
-      (cond [(and (list? val1) (list? val2))
+      (cond [(or (sql-null? val1)
+                 (sql-null? val2))
+             item1]
+            [(and (list? val1) (list? val2))
              (cons ref
                    (reverse
                     ((inst foldl GroupedRow GroupedResults)
@@ -296,20 +300,22 @@
   (filter-map
    (λ([record : GroupedRow]) : (U False GroupedRow)
      (let ([after-nulls-removal (eliminate-null-record record)])
-       (cond [(LocalSQLNull? after-nulls-removal)
+       (cond [(sql-null? after-nulls-removal)
               #f]
              [else
               after-nulls-removal])))
    g-res))
 
-(: eliminate-null-record (-> GroupedRow (U LocalSQLNull GroupedRow)))
+(: eliminate-null-record (-> GroupedRow (U SQL-Null GroupedRow)))
 (define (eliminate-null-record record)
   (let ([processed-record
          (Record
           (map (λ([item : GroupedRowItem]) : GroupedRowItem
                  (let ([ref (car item)]
                        [val (cdr item)])
-                   (cond [(list? val)
+                   (cond [(sql-null? val)
+                          item]
+                         [(list? val)
                           (cons ref
                                 (eliminate-null-collections val))]
                          [(Record? val)
@@ -320,7 +326,7 @@
                (Record-val record)))
          ])
     (cond [(all-nulls-or-empty-lists? processed-record)
-           (LocalSQLNull)]
+           sql-null]
           [else
            processed-record])))
 
@@ -329,11 +335,11 @@
   (andmap (λ([item : GroupedRowItem])
             (let ([ref (car item)]
                   [val (cdr item)])
-              (cond [(Record? val)
-                     (all-nulls-or-empty-lists? val)]
-                    [(or (null? val)
-                         (LocalSQLNull? val))
+              (cond [(or (null? val)
+                         (sql-null? val))
                      #t]
+                    [(Record? val)
+                     (all-nulls-or-empty-lists? val)]
                     [(list? val)
                      (andmap all-nulls-or-empty-lists? val)]
                     [else
@@ -365,7 +371,9 @@
      (let* ([ref (car p)]
             [val (cdr p)]
             [processed-val
-             (cond [(Record? val)
+             (cond [(sql-null? val)
+                    val]
+                   [(Record? val)
                     (hash-row val)]
                    [(list? val)
                     (grouped-results->hash-results val)]
