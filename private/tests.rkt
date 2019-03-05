@@ -416,7 +416,8 @@ EOF
       #("111532532" 2 "somebody" 12 "foo" 12 2)
       #(,sql-null ,sql-null ,sql-null ,sql-null "foo" ,sql-null 2)))
 
-  (check-equal?
+  (check
+   equal?
    (gv2:group-rows (PreparedQuery-groupings 1-N-N-prep-query)
                    (PreparedQuery-sel-refs-map 1-N-N-prep-query)
                    1-N-N-results)
