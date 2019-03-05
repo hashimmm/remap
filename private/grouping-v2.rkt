@@ -33,24 +33,84 @@
   (require typed/rackunit))
 
 (require racket/list
+         racket/vector
          racket/string
          "query.rkt"
          "tables.rkt"
          "utils.rkt")
 
 (require/typed db
+               [#:struct sql-timestamp
+                ([year : Exact-Nonnegative-Integer]
+                 [month : Exact-Nonnegative-Integer]
+                 [day : Exact-Nonnegative-Integer]
+                 [hour : Exact-Nonnegative-Integer]
+                 [minute : Exact-Nonnegative-Integer]
+                 [second : Exact-Nonnegative-Integer]
+                 [nanosecond : Exact-Nonnegative-Integer]
+                 [tz : (U Integer False)])]
                [sql-null? (-> Any Boolean)])
+#|
+(require/typed db
+               [#:opaque SqlNull sql-null?]
+               [#:opaque SqlDate sql-date?]
+               [#:opaque SqlTime sql-time?]
+               [#:opaque SqlTimestamp sql-timestamp?]
+               [#:opaque SqlInterval sql-interval?])
+(require/typed db/util/postgresql
+               [#:opaque PGRange pg-range-or-empty?]
+               [#:opaque PGisPath pg-path?]
+               [#:opaque PGisBox pg-box?]
+               [#:opaque PGisCircle pg-circle?])
+(require/typed db/util/geometry
+               [#:opaque PGisPoint point?]
+               [#:opaque PGisLineSegment line?]
+               [#:opaque PGisPolygon polygon?])
+|#
 
-(define-type Any (U String Number Boolean))
+(struct LocalSQLNull () #:prefab)
 
-(define-type ResultRow (Vectorof Any))
+(define-type AnyVal
+  (U String
+     Number
+     Boolean
+     Char
+     Bytes
+     sql-timestamp
+     LocalSQLNull
+     #|SQL-Null
+     SqlDate
+     SqlTime
+     SqlInterval
+     PGRange
+     PGisPoint
+     PGisLineSegment
+     PGisPath
+     PGisBox
+     PGisPolygon
+     PGisCircle|#))
+
+(define-type RawResults (Listof (Vectorof Any)))
+
+(define-type ResultRow (Vectorof AnyVal))
 (define-type Results (Listof ResultRow))
+
+(: pre-process-results (-> RawResults Results))
+(define (pre-process-results raw-res)
+  (map (λ([row-vec : (Vectorof Any)])
+         (vector-map (λ([val : Any])
+                       (cond [(sql-null? val)
+                              (LocalSQLNull)]
+                             [else
+                              (cast val AnyVal)]))
+                     row-vec))
+       raw-res))
 
 (define-type GroupedRowItem
   (Pairof Symbol
           (U GroupedRow  ;; Row?
              GroupedResults  ;; List?
-             Any)))
+             AnyVal)))
 
 (define-type GroupedRow
   (Record GroupedRowItem))
@@ -61,15 +121,17 @@
 (define-type GroupedResults
   (Listof GroupedRow))
 
-(: group-rows (-> Groupings SelectableNameMap Results GroupedResults))
-(define (group-rows groupings sel-ref-map results)
+(: group-rows (-> Groupings SelectableNameMap RawResults GroupedResults))
+(define (group-rows groupings sel-ref-map raw-results)
+  (define results (pre-process-results raw-results))
   (cond [(null? results)
          results]
         [else
-         (merge-rows
-          (expand-rows groupings sel-ref-map results))]))
+         (eliminate-null-collections
+          (merge-rows
+           (expand-rows groupings sel-ref-map results)))]))
 
-(: group-query-result (-> (U PreparedQuery Query) Results GroupedResults))
+(: group-query-result (-> (U PreparedQuery Query) RawResults GroupedResults))
 (define (group-query-result pq-or-q res)
   (define pq (if (PreparedQuery? pq-or-q) pq-or-q (prepare-query pq-or-q)))
   (group-rows (PreparedQuery-groupings pq)
@@ -78,14 +140,14 @@
 
 (: expand-rows (-> Groupings SelectableNameMap Results GroupedResults))
 (define (expand-rows groupings sel-ref-map results)
-  (map (λ([row-vec : (Vectorof Any)]) : GroupedRow
+  (map (λ([row-vec : (Vectorof AnyVal)]) : GroupedRow
          (Record
           ((inst map
                  GroupedRowItem
-                 Any
+                 AnyVal
                  (Pairof Selectable (Listof Relation))
                  (Pairof Selectable SelRef))
-           (λ([x : Any]
+           (λ([x : AnyVal]
               [sel-n-rels : (Pairof Selectable (Listof Relation))]
               [sel-n-ref : (Pairof Selectable SelRef)])
              : GroupedRowItem
@@ -95,7 +157,7 @@
            sel-ref-map)))
        results))
 
-(: expand-item (-> Any
+(: expand-item (-> AnyVal
                    (Pairof Selectable (Listof Relation))
                    (Pairof Selectable SelRef)
                    GroupedRowItem))
@@ -229,10 +291,59 @@
     (Record-val row1)
     (Record-val row2))))
 
+(: eliminate-null-collections (-> GroupedResults GroupedResults))
+(define (eliminate-null-collections g-res)
+  (filter-map
+   (λ([record : GroupedRow]) : (U False GroupedRow)
+     (let ([after-nulls-removal (eliminate-null-record record)])
+       (cond [(LocalSQLNull? after-nulls-removal)
+              #f]
+             [else
+              after-nulls-removal])))
+   g-res))
+
+(: eliminate-null-record (-> GroupedRow (U LocalSQLNull GroupedRow)))
+(define (eliminate-null-record record)
+  (let ([processed-record
+         (Record
+          (map (λ([item : GroupedRowItem]) : GroupedRowItem
+                 (let ([ref (car item)]
+                       [val (cdr item)])
+                   (cond [(list? val)
+                          (cons ref
+                                (eliminate-null-collections val))]
+                         [(Record? val)
+                          (cons ref
+                                (eliminate-null-record val))]
+                         [else
+                          item])))
+               (Record-val record)))
+         ])
+    (cond [(all-nulls-or-empty-lists? processed-record)
+           (LocalSQLNull)]
+          [else
+           processed-record])))
+
+(: all-nulls-or-empty-lists? (-> GroupedRow Boolean))
+(define (all-nulls-or-empty-lists? row)
+  (andmap (λ([item : GroupedRowItem])
+            (let ([ref (car item)]
+                  [val (cdr item)])
+              (cond [(Record? val)
+                     (all-nulls-or-empty-lists? val)]
+                    [(or (null? val)
+                         (LocalSQLNull? val))
+                     #t]
+                    [(list? val)
+                     (andmap all-nulls-or-empty-lists? val)]
+                    [else
+                     #f])))
+          (Record-val row)))
+
 (define-type HashRowVal
   (U HashRow  ;; Row?
      HashResults  ;; List?
-     Any))
+     AnyVal))
 
 (define-type HashRow
   (HashTable Symbol HashRowVal))

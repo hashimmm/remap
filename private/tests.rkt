@@ -1,11 +1,12 @@
 #lang typed/racket/base
 
-(require "tables.rkt"
+(require racket/list
+         (only-in typed/db sql-null)
+         "tables.rkt"
          "query.rkt"
          "grouping.rkt"
          "utils.rkt"
-         (prefix-in gv2: "grouping-v2.rkt")
-         racket/list)
+         (prefix-in gv2: "grouping-v2.rkt"))
 
 (module+ test
   (require typed/rackunit))
@@ -178,8 +179,8 @@ EOF
   (define sel-t5-with-t4-and-t4-set
     (include sel-t5-with-t4
              (RelatedColumn rel:t5->t4-set
-                         (Rel
-                          (UuidColumn 'id)))))
+                            (Rel
+                             (UuidColumn 'id)))))
   (define-values
     (with-relations-query-str with-relations-groupings)
     (to-sql-with-groupings sel-t5-with-t4-and-t4-set))
@@ -334,14 +335,14 @@ EOF
                               rel
                               (Rel (UuidColumn 'stuff-id))))))
      (make-1-1-relation 'parent
-                       stuff-tbl
-                       (λ(tbl rel)
-                         (Equal (TableColumn
-                                 tbl
-                                 (UuidColumn 'parent-id))
-                                (RelatedColumn
-                                 rel
-                                 (Rel (UuidColumn 'id))))))))
+                        stuff-tbl
+                        (λ(tbl rel)
+                          (Equal (TableColumn
+                                  tbl
+                                  (UuidColumn 'parent-id))
+                                 (RelatedColumn
+                                  rel
+                                  (Rel (UuidColumn 'id))))))))
 
   (set-Table-relations! stuff-tbl stuff-rels)
 
@@ -381,10 +382,10 @@ EOF
         (first user-rels)
         (Rel (UuidColumn 'id)))))
      (RelatedColumn
-       (first stuff-rels)
-       (RelatedColumn
-        (first user-rels)
-        (Rel (TextColumn 'number))))))
+      (first stuff-rels)
+      (RelatedColumn
+       (first user-rels)
+       (Rel (TextColumn 'number))))))
 
   (define 1-N-N-prep-query
     (prepare-query 1-N-N-query))
@@ -406,56 +407,64 @@ LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
 EOF
    )
 
+  (: 1-N-N-results gv2:RawResults)
   (define 1-N-N-results
-    '(#("090078601" 1 "somebody" 11 "thing" 11 1)
+    `(#("090078601" 1 "somebody" 11 "thing" 11 1)
       #("111532532" 2 "somebody" 11 "thing" 11 1)
       #("111241241" 3 "otherbody" 11 "thing" 11 1)
       #("111244622" 4 "otherbody" 12 "foo" 12 2)
-      #("111532532" 2 "somebody" 12 "foo" 12 2)))
+      #("111532532" 2 "somebody" 12 "foo" 12 2)
+      #(,sql-null ,sql-null ,sql-null ,sql-null "foo" ,sql-null 2)))
 
   (check-equal?
    (gv2:group-rows (PreparedQuery-groupings 1-N-N-prep-query)
                    (PreparedQuery-sel-refs-map 1-N-N-prep-query)
                    1-N-N-results)
    (list
- (Record
-  (list
-   (list
-    'users
     (Record
      (list
-      '(name . "somebody")
       (list
-       'phone-numbers
-       (Record '((id . 1) (number . "090078601")))
-       (Record '((id . 2) (number . "111532532"))))))
+       'users
+       (Record
+        (list
+         '(name . "somebody")
+         (list
+          'phone-numbers
+          (Record '((id . 1) (number . "090078601")))
+          (Record '((id . 2) (number . "111532532"))))))
+       (Record
+        (list
+         '(name . "otherbody")
+         (list
+          'phone-numbers
+          (Record '((id . 3) (number . "111241241")))))))
+      (cons 'parent (Record '((id . 11))))
+      '(name . "thing")
+      '(parent-id . 11)
+      '(id . 1)))
     (Record
      (list
-      '(name . "otherbody")
       (list
-       'phone-numbers
-       (Record '((id . 3) (number . "111241241")))))))
-   (cons 'parent (Record '((id . 11))))
-   '(name . "thing")
-   '(parent-id . 11)
-   '(id . 1)))
- (Record
-  (list
-   (list
-    'users
+       'users
+       (Record
+        (list
+         '(name . "otherbody")
+         (list
+          'phone-numbers
+          (Record '((id . 4) (number . "111244622"))))))
+       (Record
+        (list
+         '(name . "somebody")
+         (list
+          'phone-numbers
+          (Record '((id . 2) (number . "111532532")))))))
+      (cons 'parent (Record '((id . 12))))
+      '(name . "foo")
+      '(parent-id . 12)
+      '(id . 2)))
     (Record
-     (list
-      '(name . "otherbody")
-      (list
-       'phone-numbers
-       (Record '((id . 4) (number . "111244622"))))))
-    (Record
-     (list
-      '(name . "somebody")
-      (list
-       'phone-numbers
-       (Record '((id . 2) (number . "111532532")))))))
-   (cons 'parent (Record '((id . 12))))
-   '(name . "foo")
-   '(parent-id . 12)
-   '(id . 2))))))
+    '((users)
+      (parent . #s(LocalSQLNull))
+      (name . "foo")
+      (parent-id . #s(LocalSQLNull))
+      (id . 2))))))
