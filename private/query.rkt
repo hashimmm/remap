@@ -350,6 +350,29 @@
              sel-map))
    "\n, "))
 
+(: render-where (-> WhereClause
+                    RelationNameMap
+                    String))
+(define (render-where where mapping)
+  (cond [(or (SQL-Literal? where)
+             (TableColumn? where)
+             (RelatedColumn? where))
+         (render-sel where mapping)]
+        [else
+         (string-join
+          (map (λ([x : (U String WhereParam)])
+                 (cond [(string? x) x]
+                       [(SQL-Param? x)
+                        "?"]
+                       [(or (SQL-Literal? x)
+                            (TableColumn? x)
+                            (RelatedColumn? x))
+                        (render-sel x mapping)]
+                       [else
+                        (render-where x mapping)]))
+               (send where to-str))
+          "")]))
+
 (: render-tbl-name (-> Table String))
 (define (render-tbl-name tbl)
   (let ([schema (Table-schema tbl)])
@@ -510,9 +533,17 @@
     (render-tbl-name (Query-from (PreparedQuery-query pq))))
   (define rendered-joins
     (render-joins (PreparedQuery-rel-refs pq)))
+  (define where-clause (Query-where (PreparedQuery-query pq)))
+  (define rendered-where-clause
+    (if where-clause
+        (format "WHERE ~a"
+                (render-where where-clause
+                              (PreparedQuery-rel-refs pq)))
+        ""))
   (define rendered-stmt
-    (format "SELECT ~a~nFROM ~a~n~a"
+    (format "SELECT ~a~nFROM ~a~n~a~a"
             rendered-sels
             rendered-from-clause
-            rendered-joins))
+            rendered-joins
+            rendered-where-clause))
   rendered-stmt)
