@@ -17,9 +17,6 @@
 ;; the same relations horizontally, and then for each
 ;; subsequent row merge vertically.
 
-;; TODO: sql-null clearing (i.e. clear one-to-many groups
-;; with all nulls).
-
 ;; TODO: the double reverse means we're probably being
 ;; silly somewhere, in the "merge-records" function.
 
