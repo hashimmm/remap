@@ -16,7 +16,8 @@
 (struct Query
   ([selectables : (Listof Selectable)]
    [from : Table]
-   [joins : (Listof JoinGraph)])
+   [joins : (Listof JoinGraph)]
+   [where : (U WhereClause False)])
   #:transparent)
 (define-type Selectable FuncAnyParam)
 
@@ -32,7 +33,7 @@
 
 (: select-from (-> Table (Listof QualifiedAnyColumn) Query))
 (define (select-from table columns)
-  (for/fold ([query (Query '() table '())])
+  (for/fold ([query (Query '() table '() #f)])
             ([col (in-list columns)])
     (include query col)))
 
@@ -120,6 +121,38 @@
                 [query-with-path (ensure-path query rel-path)])
            (add-select query-with-path qc))]))
 
+(: where (-> Query WhereFunc Query))
+(define (where query where-func)
+  (cond [(TableColumn? where-func)
+         (if (equal? (Query-from query)
+                     (TableColumn-qualifier where-func))
+             (struct-copy Query query
+                          [where where-func])
+             (raise-arguments-error
+              'includef
+              "TableColumn must be of same table as query."
+              "TableColumn-qualifier" (TableColumn-qualifier where-func)
+              "Query-from" (Query-from query)))]
+        [(RelatedColumn? where-func)
+         (let* ([rel-path (extract-rel-path where-func)]
+                [query-with-path (ensure-path query rel-path)])
+           (struct-copy Query query-with-path
+                        [where where-func]))]
+        [(SQL-Literal? where-func)
+         (struct-copy Query query
+                      [where where-func])]
+        [else
+         (let ([qcs (WhereFunc->Columns where-func)])
+           (for/fold : Query
+             ([new-q : Query (struct-copy Query query
+                                          [where where-func])])
+             ([col : QualifiedAnyColumn (in-list qcs)])
+             (cond [(TableColumn? col)
+                    new-q]
+                   [(RelatedColumn? col)
+                    (let ([rel-path (extract-rel-path col)])
+                      (ensure-path new-q rel-path))])))]))
+
 (define-type RelationNameMap (Listof (Pairof (Listof Relation) String)))
 
 ;; Traverse the list of join graphs, and assign a unique name to each node.
@@ -199,14 +232,20 @@
      (escape-ident-string col-name))))
 
 ;; Now that we have a map of relations to names, render selectables.
-(: render-sel (->* ((U Selectable Boolean) RelationNameMap)
+(: render-sel (->* (Selectable RelationNameMap)
                    ((Listof Relation))
                    String))
 (define (render-sel sel mapping [prefix '()])
-  (cond [(boolean? sel)
-         (if sel
-             "true"
-             "false")]
+  (cond [(SQL-Literal? sel)
+         (let ([lit-val (SQL-Literal-val sel)])
+           (cond [(boolean? lit-val)
+                  (if sel
+                      "true"
+                      "false")]
+                 [(string? lit-val)
+                  (escape-text lit-val)]
+                 [(number? lit-val)
+                  (number->string lit-val)]))]
         [(TableColumn? sel)
          (if (null? prefix)
              (format "~a.~a"
@@ -240,14 +279,14 @@
           "")]))
 
 (: get-sel-repr-and-alias
-   (->* ((U Selectable Boolean) RelationNameMap)
+   (->* (Selectable RelationNameMap)
         (Integer)
         (Values String String)))
 (define (get-sel-repr-and-alias sel mapping
                                 (num-for-func-or-literal 1))
-  (cond [(boolean? sel)
+  (cond [(SQL-Literal? sel)
          (let ([repr
-                (if sel "true" "false")])
+                (render-sel sel mapping)])
            (values repr
                    (format
                     "F~a"
@@ -349,20 +388,58 @@
       ([(args) (get-field args fun)]
        [(non-func-args func-args)
         ((inst my-partition
-               QualifiedAnyColumn
+               (U QualifiedAnyColumn Any-SQL-Literal)
                AnyFunc
                FuncAnyParam)
          (λ([x : FuncAnyParam])
            (or (TableColumn? x)
-               (RelatedColumn? x)))
-         args)])
+               (RelatedColumn? x)
+               (SQL-Literal? x)))
+         args)]
+       [(col-args)
+        (filter (λ([x : (U Any-SQL-Literal QualifiedAnyColumn)])
+                  (or (TableColumn? x) (RelatedColumn? x)))
+                non-func-args)])
     (cond [(null? func-args)
-           non-func-args]
+           col-args]
           [else
            (append
-            non-func-args
+            col-args
             ((inst append-map QualifiedAnyColumn AnyFunc)
              Func->Columns func-args))])))
+
+(: WhereFunc->Columns (-> WhereFunc
+                          (Listof QualifiedAnyColumn)))
+(define (WhereFunc->Columns fun)
+  (let*-values
+      ([(args) (get-field args fun)]
+       [(non-func-args func-args)
+        ((inst my-partition
+               (U QualifiedAnyColumn
+                  Any-SQL-Literal
+                  SQL-Param)
+               WhereFunc
+               WhereParam)
+         (λ([x : WhereParam])
+           (or (TableColumn? x)
+               (RelatedColumn? x)
+               (SQL-Literal? x)
+               (SQL-Param? x)))
+         args)]
+       [(col-args)
+        (filter (λ([x : (U QualifiedAnyColumn
+                           Any-SQL-Literal
+                           SQL-Param)])
+                  (or (TableColumn? x)
+                      (RelatedColumn? x)))
+                non-func-args)])
+    (cond [(null? func-args)
+           col-args]
+          [else
+           (append
+            col-args
+            ((inst append-map QualifiedAnyColumn WhereFunc)
+             WhereFunc->Columns func-args))])))
 
 (: make-groupings
    (-> (Listof Selectable)
@@ -375,7 +452,7 @@
   (define (make-grouping-prefixes [sels : (Listof Selectable)]) : Groupings
     (map
      (λ([x : Selectable]) : (Pairof Selectable (Listof Relation))
-       (cond [(TableColumn? x)
+       (cond [(or (TableColumn? x) (SQL-Literal? x))
               (cons x '())]
              [(RelatedColumn? x)
               (cons x

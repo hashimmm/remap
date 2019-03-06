@@ -39,14 +39,20 @@
         [else
          (get-field returns func-param-or-qual-col)]))
 
-(define-type (Func<%> A)
+(define-type (BaseFunc<%> A B)
   (Rec Func<%>
        (Class
         (init-field
-         [args (Listof FuncAnyParam)])
+         [args (Listof B)])
         (field [returns A])
         [to-str (-> (Listof
-                     (U String FuncAnyParam)))])))
+                     (U String B)))])))
+
+(define-type (Func<%> A)
+  (BaseFunc<%> A FuncAnyParam))
+
+(define-type WhereFunc<%>
+  (BaseFunc<%> BooleanColumn WhereParam))
 
 (define-type BoolFunc<%> (Func<%> BooleanColumn))
 (define-type AnyFunc<%> (Func<%> ColIdent))
@@ -58,23 +64,51 @@
   (Instance
    (Class #:implements AnyFunc<%>)))
 
-(define-type (Func A)
+(define-type (BaseFunc A B)
   (Object
    (field [returns A]
           [args
-           (Listof FuncAnyParam)])
+           (Listof B)])
    [to-str (-> (Listof
-                (U String FuncAnyParam)))]))
+                (U String B)))]))
+
+(define-type (Func A)
+  (BaseFunc A FuncAnyParam))
+
+(struct SQL-Param () #:prefab)
+(define sql-param (SQL-Param))
+
+(define-type WhereFunc
+  (BaseFunc BooleanColumn WhereParam))
+
+(define-type WhereClause
+  (U WhereFunc
+     (QualifiedColumn BooleanColumn)
+     Bool-SQL-Literal))
+
+(define-type WhereParam
+  (U WhereFunc
+     QualifiedAnyColumn
+     Any-SQL-Literal
+     SQL-Param))
 
 (define-type (FuncParam A)
   (U (Func A)
      (QualifiedColumn A)))
 
 (define-type FuncAnyParam
-  (U AnyFunc QualifiedAnyColumn))
+  (U AnyFunc QualifiedAnyColumn Any-SQL-Literal))
 
 (define-type BoolFuncOrArg
-  (U (TableColumn BooleanColumn) BoolFunc Boolean))
+  (U (QualifiedColumn BooleanColumn)
+     BoolFunc
+     Bool-SQL-Literal))
+
+(struct (A) SQL-Literal ([val : A]) #:transparent)
+(define-type SQL-Literal-Types
+  (U Boolean String Number))
+(define-type Any-SQL-Literal (SQL-Literal SQL-Literal-Types))
+(define-type Bool-SQL-Literal (SQL-Literal Boolean))
 
 (define Equal%
   (class object%
@@ -232,14 +266,14 @@
 
 (: make-relation (-> TableName Table (-> Table Relation BoolFuncOrArg) Relation))
 (define (make-relation name to-tbl on-fun)
-  (define rel (Relation name to-tbl #f))
+  (define rel (Relation name to-tbl (SQL-Literal #f)))
   (set-Relation-on! rel
                     (on-fun to-tbl rel))
   rel)
 
 (: make-1-1-relation (-> TableName Table (-> Table OneToOneRel BoolFuncOrArg) OneToOneRel))
 (define (make-1-1-relation name to-tbl on-fun)
-  (define rel (OneToOneRel name to-tbl #f))
+  (define rel (OneToOneRel name to-tbl (SQL-Literal #f)))
   (set-Relation-on! rel
                     (on-fun to-tbl rel))
   rel)

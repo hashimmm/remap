@@ -20,7 +20,7 @@
                       (BooleanColumn 'approved)
                       (UuidColumn 'parent))
                 (λ([self : Table])
-                  (define rel (Relation 'parent-rel self #f))
+                  (define rel (Relation 'parent-rel self (SQL-Literal #f)))
                   (define on-clause
                     (Equal
                      (TableColumn self
@@ -36,7 +36,7 @@
                       (TextColumn 'name)
                       (UuidColumn 't1-id))
                 (λ([self : Table])
-                  (define rel (Relation 't1-rel tbl1 #f))
+                  (define rel (Relation 't1-rel tbl1 (SQL-Literal #f)))
                   (define on-clause
                     (Equal
                      (TableColumn self
@@ -138,7 +138,7 @@ EOF
                  (UuidColumn 't4-id))
                 (λ(x) '())))
   (define rel:t4->t5
-    (OneToOneRel 't5 tbl5 #f))
+    (OneToOneRel 't5 tbl5 (SQL-Literal #f)))
   (set-Relation-on!
    rel:t4->t5
    (Equal (TableColumn tbl4
@@ -149,7 +149,7 @@ EOF
    tbl4
    (list rel:t4->t5))
   (define rel:t5->t4
-    (OneToOneRel 't4 tbl4 #f))
+    (OneToOneRel 't4 tbl4 (SQL-Literal #f)))
   (set-Relation-on!
    rel:t5->t4
    (Equal (TableColumn tbl5
@@ -157,7 +157,7 @@ EOF
           (RelatedColumn rel:t5->t4
                          (Rel (UuidColumn 'id)))))
   (define rel:t5->t4-set
-    (Relation 't4-set tbl4 #f))
+    (Relation 't4-set tbl4 (SQL-Literal #f)))
   (set-Relation-on!
    rel:t5->t4-set
    (Equal (TableColumn tbl5 (UuidColumn 'id))
