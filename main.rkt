@@ -4,7 +4,7 @@
 ;; include the fact that we don't allow @, / and : in column names
 ;; and that we don't allow duplicate selections.
 ;; Currently we rely on these limitations (or, in the case of @,
-;; planning to rely on them).
+;; planning to rely on them). But they're all easy fixes.
 
 ;; A few notes on our experiments:
 ;; See, in PostgreSQL, we actually CAN have our cake and eat it too,
@@ -30,6 +30,9 @@
 ;; We will tie ourselves somewhat to the db package,
 ;; as opposed to tying ourselves to PostgreSQL's sql
 ;; capabilities. Each would have its own issues.
+;; We COULD just shift to plisqin's method of using group
+;; by and adding an array_agg or something, but I don't think
+;; that works very well with the `db` package.
 
 ;; A couple things to be wary of during grouping is that
 ;; you probably always want to select ids and that you probably
@@ -38,11 +41,12 @@
 ;; The best approach would involving somehow telling Racket
 ;; about the array of records type (which is slightly difficult
 ;; because the record's type is the table's type, and not just row or record.
-;;
-;; Also, it just occurred to me that the kind of programming needed in
-;; this library may be better done in Racklog.
 
 ;; TODO:
+
+;; Test and fix relations that need to depend on another relation
+;; as well as the base table. I think I tested that they work but
+;; someone ran into some trouble.
 
 ;; How to do the limits thing:
 ;; - apply limits to base query
@@ -51,23 +55,6 @@
 ;; - apply filters
 ;; - get rows
 ;; - group rows in racket using base query's ID.
-
-;; How to do the grouping thing:
-;; - Preconditions
-;;   - No aggregate functions... Actually we'll be able to support them soon.
-;;   - All columns must be given unique names.
-;;     - Stick join table names as prefixes to related column names.
-;;   - We must know which relations are 1-1 and which are 1-N
-;;   - We must be able to get QualifiedColumns from functions
-;;     - Simply add the init args as a field on the class.
-;;   - Basically the grouping level of a function is
-;;     the longest rel-path in any qualified column
-;;     it has.
-;; - If there are no relations, no groupings.
-;; - If there are any relations, all TableColumns must be grouped.
-;; - We really ought to be threading SelRef's around everywhere and
-;;   not Selectable's. Should've converted to SelRef's in query and use those
-;;   everywhere.
 
 ;; How to do permissions (This is vague-er than we hoped):
 ;; - One approach is to:
@@ -85,22 +72,21 @@
 ;;    or just "exclude" all the selectables.)
 ;; - The only thing to make easier is the grouping by id without
 ;;   being forced to select it.
+;; - Also, since we haven't gone the explicit "Grouped-Join" route
+;;   that plisqin takes, and we do the grouping in racket, we have some
+;;   additional steps
+;;   - an aggregation should trigger a group by or "DISTINCT ON" on the
+;;     pre-agg query
+;;   - then the function will be applied using that query as a sub-query
+;;   - The plan for limit, where the limit would be applied to an inner
+;;     query that wouldn't have joins, doesn't apply when aggregating,
+;;     because we'll already have a group-by, we can apply the limit
+;;     at the end.
 
 ;; Far into the future:
 ;; - TopN relations, i.e. relations with limits, may be achieved using
 ;;   lateral joins in postgresql. TopN might be a non-essential condition
 ;;   on the discussed relation subtype.
-;; - We may want to factor out some of the stuff
-;;   to-sql does, namely the mapping generation,
-;;   and store/update it on the query itself,
-;;   incrementally, during initial creation and
-;;   includes. The thing to take care of would
-;;   be preservation of order across include/exclude.
-;;   This way to-sql will be free to have different
-;;   implementations, and query will have all the
-;;   information any implementation may need.
-;;   For now, we'll make do with to-sql returning
-;;   the required groupings.
 
 (provide (all-from-out "private/tables.rkt"
                        "private/query.rkt"
