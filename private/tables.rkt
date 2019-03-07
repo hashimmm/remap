@@ -112,7 +112,8 @@
 
 (define Equal%
   (class object%
-    (init-field [args : (Listof FuncAnyParam)])
+    #:forall (A)
+    (init-field [args : (Listof A)])
     (super-new)
     (field [returns : BooleanColumn (BooleanColumn 'eq)])
     (define/public (to-str)
@@ -122,7 +123,12 @@
 
 (: Equal (-> FuncAnyParam FuncAnyParam BoolFunc))
 (define (Equal x y)
-  (new Equal% [args (list x y)]))
+  (new (inst Equal% FuncAnyParam) [args (list x y)]))
+
+(: Equal/w (-> WhereParam WhereParam WhereFunc))
+(define (Equal/w x y)
+  (new (inst Equal% WhereParam) [args (list x y)]))
+
 
 (: insert-commas (All (A) (-> (Listof A) (Listof (U String A)))))
 (define (insert-commas lst)

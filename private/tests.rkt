@@ -464,8 +464,122 @@ EOF
       '(parent-id . 12)
       '(id . 2)))
     (Record
-    `((users)
-      (parent . ,sql-null)
-      (name . "foo")
-      (parent-id . ,sql-null)
-      (id . 2))))))
+     `((users)
+       (parent . ,sql-null)
+       (name . "foo")
+       (parent-id . ,sql-null)
+       (id . 2)))))
+
+  (define where-query-sql-literal
+    (where
+     (select-from stuff-tbl
+                  (list
+                   (TableColumn stuff-tbl (UuidColumn 'id))
+                   (TableColumn stuff-tbl (BooleanColumn 'approved))
+                   (TableColumn stuff-tbl (UuidColumn 'parent-id))
+                   (TableColumn stuff-tbl (TextColumn 'name))))
+     (SQL-Literal #f)))
+  
+  (check-equal?
+   (to-sql where-query-sql-literal)
+   #<<EOF
+SELECT "stuff"."name" AS "name"
+, "stuff"."parent-id" AS "parent-id"
+, "stuff"."approved" AS "approved"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+WHERE false
+EOF
+   )
+
+  (define where-query-boolean-column
+    (where
+     (select-from stuff-tbl
+                  (list
+                   (TableColumn stuff-tbl (UuidColumn 'id))
+                   (TableColumn stuff-tbl (BooleanColumn 'approved))
+                   (TableColumn stuff-tbl (UuidColumn 'parent-id))
+                   (TableColumn stuff-tbl (TextColumn 'name))))
+     (TableColumn stuff-tbl (BooleanColumn 'approved))))
+  
+  (check-equal?
+   (to-sql where-query-boolean-column)
+   #<<EOF
+SELECT "stuff"."name" AS "name"
+, "stuff"."parent-id" AS "parent-id"
+, "stuff"."approved" AS "approved"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+WHERE "stuff"."approved"
+EOF
+   )
+
+  (define where-query-func
+    (where
+     (select-from stuff-tbl
+                  (list
+                   (TableColumn stuff-tbl (UuidColumn 'id))
+                   (TableColumn stuff-tbl (BooleanColumn 'approved))
+                   (TableColumn stuff-tbl (UuidColumn 'parent-id))
+                   (TableColumn stuff-tbl (TextColumn 'name))))
+     (Equal/w (TableColumn stuff-tbl (BooleanColumn 'approved)) (SQL-Literal #f))))
+  
+  (check-equal?
+   (to-sql where-query-func)
+   #<<EOF
+SELECT "stuff"."name" AS "name"
+, "stuff"."parent-id" AS "parent-id"
+, "stuff"."approved" AS "approved"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+WHERE "stuff"."approved" = false
+EOF
+   )
+  
+  (define where-query-qualified-col
+    (where
+     (select-from stuff-tbl
+                  (list
+                   (TableColumn stuff-tbl (UuidColumn 'id))
+                   (TableColumn stuff-tbl (BooleanColumn 'approved))
+                   (TableColumn stuff-tbl (UuidColumn 'parent-id))
+                   (TableColumn stuff-tbl (TextColumn 'name))))
+     (Equal/w (TableColumn stuff-tbl (UuidColumn 'parent-id))
+            (RelatedColumn (second stuff-rels) (Rel (UuidColumn 'id))))))
+
+  (check-equal?
+   (to-sql where-query-qualified-col)
+   #<<EOF
+SELECT "stuff"."name" AS "name"
+, "stuff"."parent-id" AS "parent-id"
+, "stuff"."approved" AS "approved"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+WHERE "stuff"."parent-id" = "parent"."id"
+EOF
+   )
+
+(define where-query-sql-param
+    (where
+     (select-from stuff-tbl
+                  (list
+                   (TableColumn stuff-tbl (UuidColumn 'id))
+                   (TableColumn stuff-tbl (BooleanColumn 'approved))
+                   (TableColumn stuff-tbl (UuidColumn 'parent-id))
+                   (TableColumn stuff-tbl (TextColumn 'name))))
+     (Equal/w (TableColumn stuff-tbl (UuidColumn 'parent-id))
+            sql-param)))
+
+  (check-equal?
+   (to-sql where-query-sql-param)
+   #<<EOF
+SELECT "stuff"."name" AS "name"
+, "stuff"."parent-id" AS "parent-id"
+, "stuff"."approved" AS "approved"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+WHERE "stuff"."parent-id" = ?
+EOF
+   )
+)

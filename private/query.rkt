@@ -121,7 +121,7 @@
                 [query-with-path (ensure-path query rel-path)])
            (add-select query-with-path qc))]))
 
-(: where (-> Query WhereFunc Query))
+(: where (-> Query WhereClause Query))
 (define (where query where-func)
   (cond [(TableColumn? where-func)
          (if (equal? (Query-from query)
@@ -239,7 +239,7 @@
   (cond [(SQL-Literal? sel)
          (let ([lit-val (SQL-Literal-val sel)])
            (cond [(boolean? lit-val)
-                  (if sel
+                  (if lit-val
                       "true"
                       "false")]
                  [(string? lit-val)
@@ -540,10 +540,14 @@
                 (render-where where-clause
                               (PreparedQuery-rel-refs pq)))
         ""))
+  (define rest-clauses (list rendered-joins rendered-where-clause))
+  (define rendered-rest-clauses
+    (string-join (filter (λ([s : String]) (not (string=? s "")))
+                         rest-clauses)
+                 "\n"))
   (define rendered-stmt
-    (format "SELECT ~a~nFROM ~a~n~a~a"
+    (format "SELECT ~a~nFROM ~a~n~a"
             rendered-sels
             rendered-from-clause
-            rendered-joins
-            rendered-where-clause))
+            rendered-rest-clauses))
   rendered-stmt)
