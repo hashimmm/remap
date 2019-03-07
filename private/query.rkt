@@ -37,6 +37,104 @@
             ([col (in-list columns)])
     (include query col)))
 
+
+(: find-tbl-item (-> Table Symbol (U (TableColumn ColIdent) Relation)))
+(define (find-tbl-item tbl sym)
+  (let ([found-col (find-tbl-col tbl sym)])
+    (if found-col
+        (TableColumn tbl found-col)
+        (let ([found-rel
+               (find-tbl-rel tbl sym)])
+          (or found-rel
+              (raise-arguments-error 'find-tbl-column
+                                     "No such column or relation in table."
+                                     "sym" sym "tbl" tbl))))))
+
+(: find-tbl-col (-> Table Symbol (U False ColIdent)))
+(define (find-tbl-col tbl sym)
+  (findf (λ([ci : ColIdent])
+           (equal? (ColIdent-name ci)
+                   sym))
+         (Table-columns tbl)))
+
+(: find-tbl-rel (-> Table Symbol (U False Relation)))
+(define (find-tbl-rel tbl sym)
+  (findf (λ([rel : Relation])
+           (equal? (Relation-name rel) sym))
+         (Table-relations tbl)))
+
+(: get-column-by-name (case-> (-> Table Symbol Null (TableColumn ColIdent))
+                              (-> Table Symbol (AtLeastOne Relation) (RelatedColumn ColIdent))))
+(define (get-column-by-name tbl sym rels)
+  (cond [(null? rels)
+         (let ([matching-item (find-tbl-col tbl sym)])
+           (if (not matching-item)
+               (raise-arguments-error 'get-column-by-name
+                                      "No such column."
+                                      "sym" sym "tbl" tbl)
+               (TableColumn tbl matching-item)))]
+        [(null? (rest rels))
+         (let ([matching-item (find-tbl-col tbl sym)])
+           (if (not matching-item)
+               (raise-arguments-error 'get-column-by-name
+                                      "No such column."
+                                      "sym" sym "tbl" tbl)
+               (RelatedColumn (first rels) (Rel matching-item))))]
+        [else
+         (RelatedColumn (first rels)
+                        (get-column-by-name (Relation-to (first rels))
+                                            sym
+                                            (rest rels)))]))
+
+;(select-from-2 tbl
+;               '(id
+;                 (parent id)))
+
+(define-type Col-Arg-Item (U Symbol Col-List-Arg))
+(define-type Col-Arg (Listof Col-Arg-Item))
+(define-type Col-List-Arg (Pairof Symbol (AtLeastOne Col-Arg-Item)))
+
+(: select-cols (->* (Table Col-Arg)
+                    ((Listof Relation))
+                    (Listof QualifiedAnyColumn)))
+(define (select-cols tbl cols [prefix '()])
+  (cond [(null? cols)
+         '()]
+        [else
+         (let ([first-arg (first cols)])
+           (cond [(symbol? first-arg)
+                  (let ([rev-prefix (reverse prefix)])
+                    (cons (if (null? rev-prefix)
+                              (get-column-by-name tbl first-arg rev-prefix)
+                              (get-column-by-name tbl first-arg rev-prefix))
+                          (select-cols tbl (rest cols) prefix)))]
+                 [(list? first-arg)
+                  (select-rel-col tbl first-arg prefix)]))]))
+
+(: select-rel-col (->* (Table Col-List-Arg)
+                       ((Listof Relation))
+                       (Listof QualifiedAnyColumn)))
+(define (select-rel-col tbl col-list-arg [prefix '()])
+  (let* ([rel-name (first col-list-arg)]
+         [rel (find-tbl-item tbl rel-name)])
+    (cond [(TableColumn? rel)
+           (raise-arguments-error
+            'select-cols
+            "First symbol in nested list must match a relation name."
+            "rel-name" rel-name
+            "col-list-arg" col-list-arg)]
+          [else
+           (select-cols tbl
+                        (rest col-list-arg)
+                        (cons rel prefix))])))
+
+(: select-from-2 (-> Table Col-Arg Query))
+(define (select-from-2 table columns)
+  (define selections
+    (select-cols table columns))
+  (select-from table selections))
+
+
 (: add-select (-> Query Selectable Query))
 (define (add-select query sel)
   (struct-copy Query query

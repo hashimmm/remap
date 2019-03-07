@@ -8,6 +8,7 @@
   (require typed/rackunit))
 
 (define-type (AtLeastOne A) (Pairof A (Listof A)))
+(define-type (AtLeastTwo A) (Pairof A (Pairof A (Listof A))))
 
 (: debug (All (A) (-> String A A)))
 (define (debug s x)

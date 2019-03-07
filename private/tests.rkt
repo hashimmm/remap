@@ -545,7 +545,7 @@ EOF
                    (TableColumn stuff-tbl (UuidColumn 'parent-id))
                    (TableColumn stuff-tbl (TextColumn 'name))))
      (Equal/w (TableColumn stuff-tbl (UuidColumn 'parent-id))
-            (RelatedColumn (second stuff-rels) (Rel (UuidColumn 'id))))))
+              (RelatedColumn (second stuff-rels) (Rel (UuidColumn 'id))))))
 
   (check-equal?
    (to-sql where-query-qualified-col)
@@ -560,7 +560,7 @@ WHERE "stuff"."parent-id" = "parent"."id"
 EOF
    )
 
-(define where-query-sql-param
+  (define where-query-sql-param
     (where
      (select-from stuff-tbl
                   (list
@@ -569,7 +569,7 @@ EOF
                    (TableColumn stuff-tbl (UuidColumn 'parent-id))
                    (TableColumn stuff-tbl (TextColumn 'name))))
      (Equal/w (TableColumn stuff-tbl (UuidColumn 'parent-id))
-            sql-param)))
+              sql-param)))
 
   (check-equal?
    (to-sql where-query-sql-param)
@@ -582,4 +582,20 @@ FROM "sch"."stuff"
 WHERE "stuff"."parent-id" = ?
 EOF
    )
-)
+
+  (check-equal?
+   (to-sql (select-from-2 stuff-tbl
+                          '(id
+                            name
+                            parent-id
+                            (parent id name))))
+   #<<EOF
+SELECT "parent"."name" AS "parent:name"
+, "parent"."id" AS "parent:id"
+, "stuff"."parent-id" AS "parent-id"
+, "stuff"."name" AS "name"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+EOF
+   ))
