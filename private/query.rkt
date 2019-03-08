@@ -21,6 +21,10 @@
   #:transparent)
 (define-type Selectable FuncAnyParam)
 
+(struct LiteralQuery
+  ([selectables : (Listof Any-SQL-Literal)])
+  #:transparent)
+
 ;; TODO: Defining a "Grouping" type bugs the type system up.
 (define-type Groupings (Listof (Pairof Selectable (Listof Relation))))
 
@@ -619,33 +623,41 @@
                  sel-sel-ref-mapping
                  rel-name-mapping))
 
-(: to-sql (-> (U Query PreparedQuery) String))
+(: to-sql (-> (U Query PreparedQuery LiteralQuery) String))
 (define (to-sql pq-or-q)
-  (define pq
-    (cond [(Query? pq-or-q)
-           (prepare-query pq-or-q)]
-          [else pq-or-q]))
-  (define rendered-sels
-    (render-sel-refs (PreparedQuery-sel-refs-map pq)))
-  (define rendered-from-clause
-    (render-tbl-name (Query-from (PreparedQuery-query pq))))
-  (define rendered-joins
-    (render-joins (PreparedQuery-rel-refs pq)))
-  (define where-clause (Query-where (PreparedQuery-query pq)))
-  (define rendered-where-clause
-    (if where-clause
-        (format "WHERE ~a"
-                (render-where where-clause
-                              (PreparedQuery-rel-refs pq)))
-        ""))
-  (define rest-clauses (list rendered-joins rendered-where-clause))
-  (define rendered-rest-clauses
-    (string-join (filter (λ([s : String]) (not (string=? s "")))
-                         rest-clauses)
-                 "\n"))
-  (define rendered-stmt
-    (format "SELECT ~a~nFROM ~a~n~a"
-            rendered-sels
-            rendered-from-clause
-            rendered-rest-clauses))
-  rendered-stmt)
+  (cond [(LiteralQuery? pq-or-q)
+         (format "SELECT ~a"
+                 (string-join (map
+                               (λ([x : Any-SQL-Literal])
+                                 (render-sel x '() '()))
+                               (LiteralQuery-selectables pq-or-q))
+                              ", "))]
+        [else
+         (define pq
+           (cond [(Query? pq-or-q)
+                  (prepare-query pq-or-q)]
+                 [else pq-or-q]))
+         (define rendered-sels
+           (render-sel-refs (PreparedQuery-sel-refs-map pq)))
+         (define rendered-from-clause
+           (render-tbl-name (Query-from (PreparedQuery-query pq))))
+         (define rendered-joins
+           (render-joins (PreparedQuery-rel-refs pq)))
+         (define where-clause (Query-where (PreparedQuery-query pq)))
+         (define rendered-where-clause
+           (if where-clause
+               (format "WHERE ~a"
+                       (render-where where-clause
+                                     (PreparedQuery-rel-refs pq)))
+               ""))
+         (define rest-clauses (list rendered-joins rendered-where-clause))
+         (define rendered-rest-clauses
+           (string-join (filter (λ([s : String]) (not (string=? s "")))
+                                rest-clauses)
+                        "\n"))
+         (define rendered-stmt
+           (format "SELECT ~a~nFROM ~a~n~a"
+                   rendered-sels
+                   rendered-from-clause
+                   rendered-rest-clauses))
+         rendered-stmt]))

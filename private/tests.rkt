@@ -12,6 +12,11 @@
   (require typed/rackunit))
 
 (module+ test
+  (check-equal?
+   (to-sql (LiteralQuery (list (SQL-Literal 1)
+                               (SQL-Literal "two")
+                               (SQL-Literal #f))))
+   "SELECT 1, 'two', false")
   (define tbl1
     (make-table 't1
                 'sch
