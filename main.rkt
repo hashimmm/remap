@@ -33,6 +33,9 @@
 ;; We COULD just shift to plisqin's method of using group
 ;; by and adding an array_agg or something, but I don't think
 ;; that works very well with the `db` package.
+;; Additionally, I don't think we can nest array_agg calls, and then
+;; we'd have to do render more selects and nest, and that
+;; will quickly get just as weird as this. It may still be better.
 
 ;; A couple things to be wary of during grouping is that
 ;; you probably always want to select ids and that you probably
