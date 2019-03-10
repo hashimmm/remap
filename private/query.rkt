@@ -22,7 +22,7 @@
 (define-type Selectable FuncAnyParam)
 
 (struct LiteralQuery
-  ([selectables : (Listof Any-SQL-Literal)])
+  ([selectables : (Listof (U Any-SQL-Literal SQL-Param))])
   #:transparent)
 
 ;; TODO: Defining a "Grouping" type bugs the type system up.
@@ -40,7 +40,6 @@
   (for/fold ([query (Query '() table '() #f)])
             ([col (in-list columns)])
     (include query col)))
-
 
 (: find-tbl-item (-> Table Symbol (U (TableColumn ColIdent) Relation)))
 (define (find-tbl-item tbl sym)
@@ -244,7 +243,7 @@
          (struct-copy Query query
                       [where where-func])]
         [else
-         (let ([qcs (WhereFunc->Columns where-func)])
+         (let ([qcs (Func->Columns where-func)])
            (for/fold : Query
              ([new-q : Query (struct-copy Query query
                                           [where where-func])])
@@ -338,7 +337,9 @@
                    ((Listof Relation))
                    String))
 (define (render-sel sel mapping [prefix '()])
-  (cond [(SQL-Literal? sel)
+  (cond [(SQL-Param? sel)
+         (render-sql-param)]
+        [(SQL-Literal? sel)
          (let ([lit-val (SQL-Literal-val sel)])
            (cond [(boolean? lit-val)
                   (if lit-val
@@ -375,6 +376,8 @@
          (string-join
           (map (λ([x : (U String FuncAnyParam)])
                  (cond [(string? x) x]
+                       [(SQL-Param? x)
+                        "?"]
                        [else
                         (render-sel x mapping prefix)]))
                (send sel to-str))
@@ -452,28 +455,7 @@
              sel-map))
    "\n, "))
 
-(: render-where (-> WhereClause
-                    RelationNameMap
-                    String))
-(define (render-where where mapping)
-  (cond [(or (SQL-Literal? where)
-             (TableColumn? where)
-             (RelatedColumn? where))
-         (render-sel where mapping)]
-        [else
-         (string-join
-          (map (λ([x : (U String WhereParam)])
-                 (cond [(string? x) x]
-                       [(SQL-Param? x)
-                        "?"]
-                       [(or (SQL-Literal? x)
-                            (TableColumn? x)
-                            (RelatedColumn? x))
-                        (render-sel x mapping)]
-                       [else
-                        (render-where x mapping)]))
-               (send where to-str))
-          "")]))
+(define (render-sql-param) "?")
 
 (: render-tbl-name (-> Table String))
 (define (render-tbl-name tbl)
@@ -513,16 +495,17 @@
       ([(args) (get-field args fun)]
        [(non-func-args func-args)
         ((inst my-partition
-               (U QualifiedAnyColumn Any-SQL-Literal)
+               (U QualifiedAnyColumn Any-SQL-Literal SQL-Param)
                AnyFunc
                FuncAnyParam)
          (λ([x : FuncAnyParam])
            (or (TableColumn? x)
                (RelatedColumn? x)
-               (SQL-Literal? x)))
+               (SQL-Literal? x)
+               (SQL-Param? x)))
          args)]
        [(col-args)
-        (filter (λ([x : (U Any-SQL-Literal QualifiedAnyColumn)])
+        (filter (λ([x : (U Any-SQL-Literal QualifiedAnyColumn SQL-Param)])
                   (or (TableColumn? x) (RelatedColumn? x)))
                 non-func-args)])
     (cond [(null? func-args)
@@ -532,39 +515,6 @@
             col-args
             ((inst append-map QualifiedAnyColumn AnyFunc)
              Func->Columns func-args))])))
-
-(: WhereFunc->Columns (-> WhereFunc
-                          (Listof QualifiedAnyColumn)))
-(define (WhereFunc->Columns fun)
-  (let*-values
-      ([(args) (get-field args fun)]
-       [(non-func-args func-args)
-        ((inst my-partition
-               (U QualifiedAnyColumn
-                  Any-SQL-Literal
-                  SQL-Param)
-               WhereFunc
-               WhereParam)
-         (λ([x : WhereParam])
-           (or (TableColumn? x)
-               (RelatedColumn? x)
-               (SQL-Literal? x)
-               (SQL-Param? x)))
-         args)]
-       [(col-args)
-        (filter (λ([x : (U QualifiedAnyColumn
-                           Any-SQL-Literal
-                           SQL-Param)])
-                  (or (TableColumn? x)
-                      (RelatedColumn? x)))
-                non-func-args)])
-    (cond [(null? func-args)
-           col-args]
-          [else
-           (append
-            col-args
-            ((inst append-map QualifiedAnyColumn WhereFunc)
-             WhereFunc->Columns func-args))])))
 
 (: make-groupings
    (-> (Listof Selectable)
@@ -577,7 +527,7 @@
   (define (make-grouping-prefixes [sels : (Listof Selectable)]) : Groupings
     (map
      (λ([x : Selectable]) : (Pairof Selectable (Listof Relation))
-       (cond [(or (TableColumn? x) (SQL-Literal? x))
+       (cond [(or (TableColumn? x) (SQL-Literal? x) (SQL-Param? x))
               (cons x '())]
              [(RelatedColumn? x)
               (cons x
@@ -622,42 +572,3 @@
                  groupings
                  sel-sel-ref-mapping
                  rel-name-mapping))
-
-(: to-sql (-> (U Query PreparedQuery LiteralQuery) String))
-(define (to-sql pq-or-q)
-  (cond [(LiteralQuery? pq-or-q)
-         (format "SELECT ~a"
-                 (string-join (map
-                               (λ([x : Any-SQL-Literal])
-                                 (render-sel x '() '()))
-                               (LiteralQuery-selectables pq-or-q))
-                              ", "))]
-        [else
-         (define pq
-           (cond [(Query? pq-or-q)
-                  (prepare-query pq-or-q)]
-                 [else pq-or-q]))
-         (define rendered-sels
-           (render-sel-refs (PreparedQuery-sel-refs-map pq)))
-         (define rendered-from-clause
-           (render-tbl-name (Query-from (PreparedQuery-query pq))))
-         (define rendered-joins
-           (render-joins (PreparedQuery-rel-refs pq)))
-         (define where-clause (Query-where (PreparedQuery-query pq)))
-         (define rendered-where-clause
-           (if where-clause
-               (format "WHERE ~a"
-                       (render-where where-clause
-                                     (PreparedQuery-rel-refs pq)))
-               ""))
-         (define rest-clauses (list rendered-joins rendered-where-clause))
-         (define rendered-rest-clauses
-           (string-join (filter (λ([s : String]) (not (string=? s "")))
-                                rest-clauses)
-                        "\n"))
-         (define rendered-stmt
-           (format "SELECT ~a~nFROM ~a~n~a"
-                   rendered-sels
-                   rendered-from-clause
-                   rendered-rest-clauses))
-         rendered-stmt]))

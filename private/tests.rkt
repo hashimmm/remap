@@ -6,6 +6,8 @@
          "query.rkt"
          "grouping.rkt"
          "utils.rkt"
+         "creates-and-updates.rkt"
+         "to-sql.rkt"
          (prefix-in gv2: "grouping-v2.rkt"))
 
 (module+ test
@@ -527,7 +529,7 @@ EOF
                    (TableColumn stuff-tbl (BooleanColumn 'approved))
                    (TableColumn stuff-tbl (UuidColumn 'parent-id))
                    (TableColumn stuff-tbl (TextColumn 'name))))
-     (Equal/w (TableColumn stuff-tbl (BooleanColumn 'approved)) (SQL-Literal #f))))
+     (Equal (TableColumn stuff-tbl (BooleanColumn 'approved)) (SQL-Literal #f))))
   
   (check-equal?
    (to-sql where-query-func)
@@ -549,8 +551,8 @@ EOF
                    (TableColumn stuff-tbl (BooleanColumn 'approved))
                    (TableColumn stuff-tbl (UuidColumn 'parent-id))
                    (TableColumn stuff-tbl (TextColumn 'name))))
-     (Equal/w (TableColumn stuff-tbl (UuidColumn 'parent-id))
-              (RelatedColumn (second stuff-rels) (Rel (UuidColumn 'id))))))
+     (Equal (TableColumn stuff-tbl (UuidColumn 'parent-id))
+            (RelatedColumn (second stuff-rels) (Rel (UuidColumn 'id))))))
 
   (check-equal?
    (to-sql where-query-qualified-col)
@@ -573,8 +575,8 @@ EOF
                    (TableColumn stuff-tbl (BooleanColumn 'approved))
                    (TableColumn stuff-tbl (UuidColumn 'parent-id))
                    (TableColumn stuff-tbl (TextColumn 'name))))
-     (Equal/w (TableColumn stuff-tbl (UuidColumn 'parent-id))
-              sql-param)))
+     (Equal (TableColumn stuff-tbl (UuidColumn 'parent-id))
+            sql-param)))
 
   (check-equal?
    (to-sql where-query-sql-param)
@@ -602,5 +604,19 @@ SELECT "parent"."name" AS "parent:name"
 , "stuff"."id" AS "id"
 FROM "sch"."stuff"
 LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+EOF
+   )
+
+  (check-equal?
+   (to-sql
+    (insert stuff-tbl
+            '((name ?)
+              (approved ?))))
+   #<<EOF
+INSERT INTO "sch"."stuff" (
+"name"
+, "approved"
+)
+SELECT ?, ?
 EOF
    ))

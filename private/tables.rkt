@@ -51,9 +51,6 @@
 (define-type (Func<%> A)
   (BaseFunc<%> A FuncAnyParam))
 
-(define-type WhereFunc<%>
-  (BaseFunc<%> BooleanColumn WhereParam))
-
 (define-type BoolFunc<%> (Func<%> BooleanColumn))
 (define-type AnyFunc<%> (Func<%> ColIdent))
 
@@ -78,26 +75,17 @@
 (struct SQL-Param () #:prefab)
 (define sql-param (SQL-Param))
 
-(define-type WhereFunc
-  (BaseFunc BooleanColumn WhereParam))
-
 (define-type WhereClause
-  (U WhereFunc
+  (U BoolFunc
      (QualifiedColumn BooleanColumn)
      Bool-SQL-Literal))
-
-(define-type WhereParam
-  (U WhereFunc
-     QualifiedAnyColumn
-     Any-SQL-Literal
-     SQL-Param))
 
 (define-type (FuncParam A)
   (U (Func A)
      (QualifiedColumn A)))
 
 (define-type FuncAnyParam
-  (U AnyFunc QualifiedAnyColumn Any-SQL-Literal))
+  (U AnyFunc QualifiedAnyColumn Any-SQL-Literal SQL-Param))
 
 (define-type BoolFuncOrArg
   (U (QualifiedColumn BooleanColumn)
@@ -124,11 +112,6 @@
 (: Equal (-> FuncAnyParam FuncAnyParam BoolFunc))
 (define (Equal x y)
   (new (inst Equal% FuncAnyParam) [args (list x y)]))
-
-(: Equal/w (-> WhereParam WhereParam WhereFunc))
-(define (Equal/w x y)
-  (new (inst Equal% WhereParam) [args (list x y)]))
-
 
 (: insert-commas (All (A) (-> (Listof A) (Listof (U String A)))))
 (define (insert-commas lst)

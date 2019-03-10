@@ -7,9 +7,10 @@
 
 (provide (all-defined-out))
 
-(require "query.rkt"
+(require racket/list
+         "query.rkt"
          "utils.rkt"
-         racket/list
+         "to-sql.rkt"
          "tables.rkt")
 
 (require/typed db
