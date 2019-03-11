@@ -10,6 +10,9 @@
          "to-sql.rkt"
          (prefix-in gv2: "grouping-v2.rkt"))
 
+(require/typed "fancy-select.rkt"
+               [select-from-2 (-> Table (Listof Any) Query)])
+
 (module+ test
   (require typed/rackunit))
 
@@ -618,5 +621,66 @@ INSERT INTO "sch"."stuff" (
 , "approved"
 )
 SELECT ?, ?
+EOF
+   )
+
+  (check-equal?
+   (to-sql (select-from-2 stuff-tbl
+                          '(id
+                            name
+                            (? "hello")
+                            parent-id
+                            (parent id name))))
+   #<<EOF
+SELECT "parent"."name" AS "parent:name"
+, "parent"."id" AS "parent:id"
+, "stuff"."parent-id" AS "parent-id"
+, 'hello' AS "F4"
+, "stuff"."name" AS "name"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+EOF
+   )
+
+  (check-equal?
+   (to-sql (select-from-2 stuff-tbl
+                          '(id
+                            name
+                            (? "hello")
+                            parent-id
+                            (parent id name)
+                            (@ Equal name (? "hello")))))
+   #<<EOF
+SELECT "stuff"."name" = 'hello' AS "F1"
+, "parent"."name" AS "parent:name"
+, "parent"."id" AS "parent:id"
+, "stuff"."parent-id" AS "parent-id"
+, 'hello' AS "F5"
+, "stuff"."name" AS "name"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+EOF
+   )
+
+  (check-equal?
+   (to-sql (select-from-2 stuff-tbl
+                          '(id
+                            name
+                            (? "hello")
+                            parent-id
+                            (parent id name)
+                            (@ Equal name (parent name)))))
+   #<<EOF
+SELECT "stuff"."name" = "parent"."name" AS "F1"
+, "parent"."name" AS "parent:name"
+, "parent"."id" AS "parent:id"
+, "stuff"."parent-id" AS "parent-id"
+, 'hello' AS "F5"
+, "stuff"."name" AS "name"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
 EOF
    ))
