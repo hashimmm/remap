@@ -16,11 +16,12 @@
                                       "sym" sym "tbl" tbl)
                (TableColumn tbl matching-item)))]
         [(null? (rest rels))
-         (let ([matching-item (find-tbl-col tbl sym)])
+         (let* ([rel-tbl (Relation-to (first rels))]
+                [matching-item (find-tbl-col rel-tbl sym)])
            (if (not matching-item)
                (raise-arguments-error 'get-column-by-name
                                       "No such column."
-                                      "sym" sym "tbl" tbl)
+                                      "sym" sym "rel-tbl" rel-tbl)
                (RelatedColumn (first rels) (Rel matching-item))))]
         [else
          (RelatedColumn (first rels)
