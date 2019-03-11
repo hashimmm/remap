@@ -1,4 +1,4 @@
-#lang typed/racket/base/no-check
+#lang typed/racket/base
 
 (provide (all-defined-out))
 
@@ -87,7 +87,8 @@ it as an alias.
 
 
 (struct PreparedUpdate ([table : Table]
-                        [clauses : (Listof UpdateArg)]
+                        [clauses : (Listof (Pairof Symbol
+                                                   (U Any-SQL-Literal SQL-Param)))]
                         [where : (U False WhereClause)])
   #:transparent)
 
@@ -116,6 +117,18 @@ it as an alias.
      'update
      "Where clause must return a single expression."
      "where-clause" where-clause))
+  (define clauses
+    (map (λ([x : UpdateArg])
+           (cons (first x)
+                 (if (symbol? (second x))
+                     sql-param
+                     (SQL-Literal (second x)))))
+         args))
   (PreparedUpdate tbl
-                  args
-                  (first where-clause)))
+                  clauses
+                  (if where-clause
+                      (cast
+                       ((inst first Selectable)
+                        where-clause)
+                       WhereClause)
+                      #f)))

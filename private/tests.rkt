@@ -6,8 +6,8 @@
          "query.rkt"
          "grouping.rkt"
          "utils.rkt"
-         "creates-and-updates.rkt"
          "to-sql.rkt"
+         "creates-and-updates.rkt"
          (prefix-in gv2: "grouping-v2.rkt"))
 
 (require/typed "fancy-select.rkt"
@@ -682,5 +682,18 @@ SELECT "stuff"."name" = "parent"."name" AS "F1"
 , "stuff"."id" AS "id"
 FROM "sch"."stuff"
 LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+EOF
+   )
+
+  (check-equal?
+   (to-sql
+    (update stuff-tbl
+            '((name "asdf")
+              (approved #t))
+            '(@ Equal name (? "qwer"))))
+   #<<EOF
+UPDATE "sch"."stuff" SET "name" = 'asdf'
+, "approved" = true
+WHERE "stuff"."name" = 'qwer'
 EOF
    ))

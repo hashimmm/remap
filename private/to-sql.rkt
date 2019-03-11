@@ -7,7 +7,11 @@
          "query.rkt"
          "creates-and-updates.rkt")
 
-(define-type SQL-Clause (U Query PreparedQuery LiteralQuery PreparedInsert))
+(define-type SQL-Clause (U Query
+                           PreparedQuery
+                           LiteralQuery
+                           PreparedInsert
+                           PreparedUpdate))
 
 (: to-sql (-> SQL-Clause String))
 (define (to-sql sql-clause)
@@ -36,6 +40,28 @@
          (define rendered-tbl-name (render-tbl-name (PreparedInsert-table pi)))
          (format "INSERT INTO ~a ~a~n~a"
                  rendered-tbl-name rendered-col-clause rendered-select-stmt)]
+        [(PreparedUpdate? sql-clause)
+         (define pu sql-clause)
+         (define rendered-tbl-name
+           (render-tbl-name (PreparedUpdate-table pu)))
+         (define rendered-update-clauses
+           (string-join
+            (map (λ([clause : (Pairof Symbol (U Any-SQL-Literal SQL-Param))])
+                   (format "~a = ~a"
+                           (escape-ident-symbol (car clause))
+                           (render-sel (cdr clause) '())))
+                 (PreparedUpdate-clauses pu))
+            "\n, "))
+         (define where (PreparedUpdate-where pu))
+         (define rendered-where
+           (if where
+               (format "~nWHERE ~a"
+                       (render-sel where '()))
+               ""))
+         (format "UPDATE ~a SET ~a~a"
+                 rendered-tbl-name
+                 rendered-update-clauses
+                 rendered-where)]
         [else
          (define pq sql-clause)
          (define rendered-sels
