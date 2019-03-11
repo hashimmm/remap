@@ -1,5 +1,14 @@
 #lang typed/racket/base/no-check
 
+#|
+POC for typing this module:
+(: apply-eq (-> (Listof FuncAnyParam) BoolFunc))
+(define (apply-eq args)
+  (apply
+   Equal
+   (cast args (List FuncAnyParam FuncAnyParam))))
+|#
+
 (provide (all-defined-out))
 
 (require "query.rkt"
