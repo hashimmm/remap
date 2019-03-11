@@ -94,9 +94,16 @@
 (provide (all-from-out "private/tables.rkt"
                        "private/query.rkt"
                        "private/grouping.rkt"
+                       "private/to-sql.rkt"
+                       "private/fancy-select.rkt"
+                       "private/creates-and-updates.rkt"
                        "private/grouping-v2.rkt"))
 
 (require "private/tables.rkt"
          "private/query.rkt"
          (prefix-in grouping-old: "private/grouping.rkt")
+         "private/to-sql.rkt"
+         "private/to-sql.rkt"
+         "private/fancy-select.rkt"
+         "private/creates-and-updates.rkt"
          "private/grouping-v2.rkt")
