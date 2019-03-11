@@ -1,10 +1,23 @@
-#lang typed/racket/base
+#lang typed/racket/base/no-check
 
 (provide (all-defined-out))
 
 (require racket/list
          "tables.rkt"
-         "query.rkt")
+         "query.rkt"
+         "utils.rkt")
+
+(define-type Col-Arg-Item (U Symbol Col-List-Arg))
+(define-type Col-Arg (Listof Col-Arg-Item))
+(define-type Col-List-Arg (U Col-Rel-Arg Col-Func-Arg Col-Literal-Arg))
+(define-type Col-Rel-Arg (Pairof Symbol (AtLeastOne Col-Arg-Item)))
+(define-type Col-Func-Arg (Pairof '@ (Pairof Symbol (Listof Col-Arg-Item))))
+(define-type Col-Literal-Arg (List '? SQL-Literal-Types))
+
+(require/typed "fancy-select.rkt"
+               (select-cols (->* (Table Col-Arg)
+                                 ((Listof Relation))
+                                 (Listof Selectable))))
 
 #|
 There's much to do here, for now we're just going
@@ -49,7 +62,7 @@ it as an alias.
 (define (insert tbl args)
   (define allowed-cols (map ColIdent-name (Table-columns tbl)))
   (define cols
-    (map (λ([col-n-lit : Arg]) (first col-n-lit))
+    (map (λ([col-n-lit : InsertArg]) (first col-n-lit))
          args))
   (when (not (andmap (λ([x : Symbol])
                        (member x allowed-cols))
@@ -60,7 +73,7 @@ it as an alias.
                            "allowed-cols" allowed-cols
                            "tbl" tbl))
   (define vals
-    (map (λ([col-n-lit : Arg]) (second col-n-lit))
+    (map (λ([col-n-lit : InsertArg]) (second col-n-lit))
          args))
   (define lits (map (λ([x : (U SQL-Literal-Types '?)])
                       (cond [(symbol? x)
@@ -74,18 +87,17 @@ it as an alias.
 
 
 (struct PreparedUpdate ([table : Table]
-                        [clauses : (Listof Symbol)]
-                        [query : (U LiteralQuery)]
+                        [clauses : (Listof UpdateArg)]
                         [where : (U False WhereClause)])
   #:transparent)
 
 (define-type UpdateArg (List Symbol (U SQL-Literal-Types '?)))
 
-(: update (-> Table (Listof UpdateArg) WhereClause PreparedUpdate))
-(define (update tbl args)
+(: update (-> Table (Listof UpdateArg) Col-Arg-Item PreparedUpdate))
+(define (update tbl args where)
   (define allowed-cols (map ColIdent-name (Table-columns tbl)))
   (define cols
-    (map (λ([col-n-lit : Arg]) (first col-n-lit))
+    (map (λ([col-n-lit : UpdateArg]) (first col-n-lit))
          args))
   (when (not (andmap (λ([x : Symbol])
                        (member x allowed-cols))
@@ -95,15 +107,15 @@ it as an alias.
                            "cols" cols
                            "allowed-cols" allowed-cols
                            "tbl" tbl))
-  (define vals
-    (map (λ([col-n-lit : Arg]) (second col-n-lit))
-         args))
-  (define lits (map (λ([x : (U SQL-Literal-Types '?)])
-                      (cond [(symbol? x)
-                             sql-param]
-                            [else
-                             (SQL-Literal x)]))
-                    vals))
-  (PreparedInsert tbl
-                  cols
-                  (LiteralQuery lits)))
+  (define where-clause
+    (if (not where)
+        #f
+        (select-cols tbl (list where))))
+  (when (not (= (length where-clause) 1))
+    (raise-arguments-error
+     'update
+     "Where clause must return a single expression."
+     "where-clause" where-clause))
+  (PreparedUpdate tbl
+                  args
+                  (first where-clause)))

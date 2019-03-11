@@ -16,11 +16,12 @@
                                       "sym" sym "tbl" tbl)
                (TableColumn tbl matching-item)))]
         [(null? (rest rels))
-         (let ([matching-item (find-tbl-col tbl sym)])
+         (let* ([rel-tbl (Relation-to (first rels))]
+                [matching-item (find-tbl-col rel-tbl sym)])
            (if (not matching-item)
                (raise-arguments-error 'get-column-by-name
                                       "No such column."
-                                      "sym" sym "tbl" tbl)
+                                      "sym" sym "rel-tbl" rel-tbl)
                (RelatedColumn (first rels) (Rel matching-item))))]
         [else
          (RelatedColumn (first rels)
@@ -110,8 +111,20 @@
   (define val (second col-list-arg))
   (list (SQL-Literal val)))
 
-(: select-from-2 (-> Table Col-Arg Query))
-(define (select-from-2 table columns)
+(: select-from-2 (->* (Table Col-Arg)
+                      ((U False Col-Arg-Item))
+                      Query))
+(define (select-from-2 table columns [where #f])
   (define selections
     (select-cols table columns))
-  (select-from table selections))
+  (define query (select-from table selections))
+  (if (not where)
+      query
+      (let ([where-clause (select-cols table (list where))])
+        (cond [(not (= (length where-clause) 1))
+               (raise-arguments-error
+                'select-from-2
+                "Where clause must return a single expression."
+                "where-clause" where-clause)]
+              [else
+               (where query (first where-clause))]))))

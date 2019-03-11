@@ -243,11 +243,12 @@
                  (let ([name-str (symbol->string name)])
                    (or (string-contains? name-str "/")
                        (string-contains? name-str ":")
-                       (string-contains? name-str "@"))))
+                       (string-contains? name-str "@")
+                       (string-contains? name-str "?"))))
                (append rel-names tbl-and-col-names))
     (raise-arguments-error
      'make-table
-     "Relation, table, column names may not contain @, / or : characters."
+     "Relation, table, column names may not contain @, ?, / or : characters."
      "rel-names" rel-names
      "tbl-and-col-names" tbl-and-col-names))                  
   (set-Table-relations! tbl relations)
