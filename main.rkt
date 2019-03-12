@@ -103,7 +103,12 @@
          "private/query.rkt"
          (prefix-in grouping-old: "private/grouping.rkt")
          "private/to-sql.rkt"
-         "private/to-sql.rkt"
-         "private/fancy-select.rkt"
+         (except-in "private/fancy-select.rkt"
+                    Col-Arg-Item
+                    Col-Arg
+                    Col-List-Arg 
+                    Col-Rel-Arg 
+                    Col-Func-Arg 
+                    Col-Literal-Arg)
          "private/creates-and-updates.rkt"
          "private/grouping-v2.rkt")
