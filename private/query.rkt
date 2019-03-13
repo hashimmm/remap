@@ -50,7 +50,7 @@
         (let ([found-rel
                (find-tbl-rel tbl sym)])
           (or found-rel
-              (raise-arguments-error 'find-tbl-column
+              (raise-arguments-error 'find-tbl-item
                                      "No such column or relation in table."
                                      "sym" sym "tbl" tbl))))))
 
