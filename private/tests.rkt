@@ -20,8 +20,9 @@
   (check-equal?
    (to-sql (LiteralQuery (list (SQL-Literal 1)
                                (SQL-Literal "two")
-                               (SQL-Literal #f))))
-   "SELECT 1, 'two', false")
+                               (SQL-Literal #f)
+                               (SQL-Literal 'null))))
+   "SELECT 1, 'two', false, NULL")
   (define tbl1
     (make-table 't1
                 'sch
