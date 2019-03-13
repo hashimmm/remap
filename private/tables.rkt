@@ -94,7 +94,7 @@
 
 (struct (A) SQL-Literal ([val : A]) #:transparent)
 (define-type SQL-Literal-Types
-  (U Boolean String Number))
+  (U Boolean String Number 'null))
 (define-type Any-SQL-Literal (SQL-Literal SQL-Literal-Types))
 (define-type Bool-SQL-Literal (SQL-Literal Boolean))
 

@@ -290,7 +290,9 @@
                  [(string? lit-val)
                   (escape-text lit-val)]
                  [(number? lit-val)
-                  (number->string lit-val)]))]
+                  (number->string lit-val)]
+                 [(symbol? lit-val)
+                  "NULL"]))]
         [(TableColumn? sel)
          (if (null? prefix)
              (format "~a.~a"
