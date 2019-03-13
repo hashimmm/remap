@@ -688,8 +688,8 @@ EOF
   (check-equal?
    (to-sql
     (update stuff-tbl
-            '((name "asdf")
-              (approved #t))
+            '((name (? "asdf"))
+              (approved (? #t)))
             '(@ Equal name (? "qwer"))))
    #<<EOF
 UPDATE "sch"."stuff" SET "name" = 'asdf'

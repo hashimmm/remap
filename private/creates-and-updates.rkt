@@ -92,7 +92,7 @@ it as an alias.
                         [where : (U False WhereClause)])
   #:transparent)
 
-(define-type UpdateArg (List Symbol (U SQL-Literal-Types '?)))
+(define-type UpdateArg (List Symbol Col-Literal-Arg))
 
 (: update (-> Table (Listof UpdateArg) Col-Arg-Item PreparedUpdate))
 (define (update tbl args where)
@@ -119,10 +119,11 @@ it as an alias.
      "where-clause" where-clause))
   (define clauses
     (map (λ([x : UpdateArg])
-           (cons (first x)
-                 (if (symbol? (second x))
+           (let ([val (second (second x))])
+             (cons (first x)
+                   (if (symbol? val)
                      sql-param
-                     (SQL-Literal (second x)))))
+                     (SQL-Literal val)))))
          args))
   (PreparedUpdate tbl
                   clauses
