@@ -92,7 +92,7 @@ POC for typing this module:
             "rel-name" rel-name
             "col-list-arg" col-list-arg)]
           [else
-           (select-cols tbl
+           (select-cols (Relation-to rel)
                         (rest col-list-arg)
                         (cons rel prefix))])))
 
