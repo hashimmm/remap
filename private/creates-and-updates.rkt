@@ -110,9 +110,7 @@ it as an alias.
     (map (λ([x : UpdateArg])
            (let ([val (second (second x))])
              (cons (first x)
-                   (if (symbol? val)
-                     sql-param
-                     (SQL-Literal val)))))
+                   (SQL-Literal val))))
          args))
   (PreparedUpdate tbl
                   clauses

@@ -691,11 +691,13 @@ EOF
    (to-sql
     (update stuff-tbl
             '((name (? "asdf"))
-              (approved (? #t)))
+              (approved (? #t))
+              (parent-id (? null)))
             '(@ Equal name (? "qwer"))))
    #<<EOF
 UPDATE "sch"."stuff" SET "name" = 'asdf'
 , "approved" = true
+, "parent-id" = NULL
 WHERE "stuff"."name" = 'qwer'
 EOF
    )
