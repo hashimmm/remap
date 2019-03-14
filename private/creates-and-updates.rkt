@@ -5,19 +5,8 @@
 (require racket/list
          "tables.rkt"
          "query.rkt"
-         "utils.rkt")
-
-(define-type Col-Arg-Item (U Symbol Col-List-Arg))
-(define-type Col-Arg (Listof Col-Arg-Item))
-(define-type Col-List-Arg (U Col-Rel-Arg Col-Func-Arg Col-Literal-Arg))
-(define-type Col-Rel-Arg (Pairof Symbol (AtLeastOne Col-Arg-Item)))
-(define-type Col-Func-Arg (Pairof '@ (Pairof Symbol (Listof Col-Arg-Item))))
-(define-type Col-Literal-Arg (List '? SQL-Literal-Types))
-
-(require/typed "fancy-select.rkt"
-               (select-cols (->* (Table Col-Arg)
-                                 ((Listof Relation))
-                                 (Listof Selectable))))
+         "utils.rkt"
+         "fancy-select.rkt")
 
 #|
 There's much to do here, for now we're just going

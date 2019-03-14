@@ -1,17 +1,11 @@
-#lang typed/racket/base/no-check
-
-#|
-POC for typing this module:
-(: apply-eq (-> (Listof FuncAnyParam) BoolFunc))
-(define (apply-eq args)
-  (apply
-   Equal
-   (cast args (List FuncAnyParam FuncAnyParam))))
-|#
+#lang typed/racket/base
 
 (provide (all-defined-out))
 
-(require "query.rkt"
+(require racket/list
+         racket/bool
+         "utils.rkt"
+         "query.rkt"
          "tables.rkt")
 
 (: get-column-by-name (case-> (-> Table Symbol Null (TableColumn ColIdent))
@@ -96,10 +90,16 @@ POC for typing this module:
                         (rest col-list-arg)
                         (cons rel prefix))])))
 
+(: apply-eq (-> (Listof FuncAnyParam) BoolFunc))
+(define (apply-eq args)
+  (apply
+   Equal
+   (cast args (List FuncAnyParam FuncAnyParam))))
+
 (: func-mapping (HashTable Symbol
-                           (->* () () #:rest Selectable AnyFunc)))
+                           (-> (Listof Selectable) AnyFunc)))
 (define func-mapping
-  (hash 'Equal Equal))
+  (hash 'Equal apply-eq))
 
 (: select-func (->* (Table Col-Func-Arg)
                     ((Listof Relation))
@@ -111,7 +111,7 @@ POC for typing this module:
     (hash-ref func-mapping fun-name))
   (define arg-list
     (select-cols tbl fun-args prefix))
-  (list (apply function arg-list)))
+  (list (function arg-list)))
 
 (: select-literal (->* (Table Col-Literal-Arg)
                        ((Listof Relation))
@@ -123,17 +123,17 @@ POC for typing this module:
 (: select-from-2 (->* (Table Col-Arg)
                       ((U False Col-Arg-Item))
                       Query))
-(define (select-from-2 table columns [where #f])
+(define (select-from-2 table columns [where-arg #f])
   (define selections
     (select-cols table columns))
   (define query (select-from table selections))
-  (if (not where)
+  (if (not where-arg)
       query
-      (let ([where-clause (select-cols table (list where))])
+      (let ([where-clause (select-cols table (list where-arg))])
         (cond [(not (= (length where-clause) 1))
                (raise-arguments-error
                 'select-from-2
                 "Where clause must return a single expression."
                 "where-clause" where-clause)]
               [else
-               (where query (first where-clause))]))))
+               (where query (cast (first where-clause) WhereClause))]))))

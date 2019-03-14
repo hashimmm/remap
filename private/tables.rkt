@@ -254,16 +254,16 @@
   (set-Table-relations! tbl relations)
   tbl)
 
-(: make-relation (-> TableName Table (-> Table Relation BoolFuncOrArg) Relation))
-(define (make-relation name to-tbl on-fun)
+(: make-relation (-> TableName Table Table (-> Table Relation BoolFuncOrArg) Relation))
+(define (make-relation name from-tbl to-tbl on-fun)
   (define rel (Relation name to-tbl (SQL-Literal #f)))
   (set-Relation-on! rel
-                    (on-fun to-tbl rel))
+                    (on-fun from-tbl rel))
   rel)
 
-(: make-1-1-relation (-> TableName Table (-> Table OneToOneRel BoolFuncOrArg) OneToOneRel))
-(define (make-1-1-relation name to-tbl on-fun)
+(: make-1-1-relation (-> TableName Table Table (-> Table OneToOneRel BoolFuncOrArg) OneToOneRel))
+(define (make-1-1-relation name from-tbl to-tbl on-fun)
   (define rel (OneToOneRel name to-tbl (SQL-Literal #f)))
   (set-Relation-on! rel
-                    (on-fun to-tbl rel))
+                    (on-fun from-tbl rel))
   rel)

@@ -7,11 +7,9 @@
          "grouping.rkt"
          "utils.rkt"
          "to-sql.rkt"
+         "fancy-select.rkt"
          "creates-and-updates.rkt"
          (prefix-in gv2: "grouping-v2.rkt"))
-
-(require/typed "fancy-select.rkt"
-               [select-from-2 (-> Table (Listof Any) Query)])
 
 (module+ test
   (require typed/rackunit))
@@ -337,6 +335,7 @@ EOF
   (define stuff-rels
     (list
      (make-relation 'users
+                    stuff-tbl
                     users-tbl
                     (λ(tbl rel)
                       (Equal (TableColumn
@@ -346,6 +345,7 @@ EOF
                               rel
                               (Rel (UuidColumn 'stuff-id))))))
      (make-1-1-relation 'parent
+                        stuff-tbl
                         stuff-tbl
                         (λ(tbl rel)
                           (Equal (TableColumn
@@ -360,6 +360,7 @@ EOF
   (define user-rels
     (list
      (make-relation 'phone-numbers
+                    users-tbl
                     phone-numbers-tbl
                     (λ(tbl rel)
                       (Equal (TableColumn
@@ -412,7 +413,7 @@ SELECT "users/phone-numbers"."number" AS "users/phone-numbers:number"
 , "stuff"."parent-id" AS "parent-id"
 , "stuff"."id" AS "id"
 FROM "sch"."stuff"
-LEFT OUTER JOIN "sch"."users" AS "users" ON "users"."id" = "users"."stuff-id"
+LEFT OUTER JOIN "sch"."users" AS "users" ON "stuff"."id" = "users"."stuff-id"
 LEFT OUTER JOIN "sch"."phone-numbers" AS "users/phone-numbers" ON "users"."id" = "users/phone-numbers"."user-id"
 LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
 EOF
@@ -696,5 +697,34 @@ EOF
 UPDATE "sch"."stuff" SET "name" = 'asdf'
 , "approved" = true
 WHERE "stuff"."name" = 'qwer'
+EOF
+   )
+
+  (check-equal?
+   (to-sql
+    (select-from-2
+     stuff-tbl
+     '(id
+       name
+       (? "hello")
+       parent-id
+       (parent id name)
+       (users id (phone-numbers number) name))
+     '(@ Equal (users (phone-numbers number)) (? "090078601"))))
+   #<<EOF
+SELECT "users"."name" AS "users:name"
+, "users/phone-numbers"."number" AS "users/phone-numbers:number"
+, "users"."id" AS "users:id"
+, "parent"."name" AS "parent:name"
+, "parent"."id" AS "parent:id"
+, "stuff"."parent-id" AS "parent-id"
+, 'hello' AS "F7"
+, "stuff"."name" AS "name"
+, "stuff"."id" AS "id"
+FROM "sch"."stuff"
+LEFT OUTER JOIN "sch"."users" AS "users" ON "stuff"."id" = "users"."stuff-id"
+LEFT OUTER JOIN "sch"."phone-numbers" AS "users/phone-numbers" ON "users"."id" = "users/phone-numbers"."user-id"
+LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
+WHERE "users/phone-numbers"."number" = '090078601'
 EOF
    ))
