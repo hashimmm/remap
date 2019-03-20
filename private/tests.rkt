@@ -9,6 +9,7 @@
          "to-sql.rkt"
          "fancy-select.rkt"
          "creates-and-updates.rkt"
+         "delete.rkt"
          (prefix-in gv2: "grouping-v2.rkt"))
 
 (module+ test
@@ -728,5 +729,13 @@ LEFT OUTER JOIN "sch"."users" AS "users" ON "stuff"."id" = "users"."stuff-id"
 LEFT OUTER JOIN "sch"."phone-numbers" AS "users/phone-numbers" ON "users"."id" = "users/phone-numbers"."user-id"
 LEFT OUTER JOIN "sch"."stuff" AS "parent" ON "stuff"."parent-id" = "parent"."id"
 WHERE "users/phone-numbers"."number" = '090078601'
+EOF
+   )
+
+  (check-equal?
+   (to-sql (delete stuff-tbl '(@ Equal id (? "090078601"))))
+   #<<EOF
+DELETE FROM "sch"."stuff"
+WHERE "stuff"."id" = '090078601'
 EOF
    ))

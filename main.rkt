@@ -51,6 +51,11 @@
 ;; as well as the base table. I think I tested that they work but
 ;; someone ran into some trouble.
 
+;; Handle advanced cases for creates, deletes and inserts.
+;; Currently for example join-based deletes will fail.
+
+;; Compose inserts, creates, updates, deletes and selects using WITH.
+
 ;; How to do the limits thing:
 ;; - apply limits to base query
 ;; - turn base query into a table expression for a FROM clause
@@ -97,7 +102,8 @@
                        "private/to-sql.rkt"
                        "private/fancy-select.rkt"
                        "private/creates-and-updates.rkt"
-                       "private/grouping-v2.rkt"))
+                       "private/grouping-v2.rkt"
+                       "private/delete.rkt"))
 
 (require "private/tables.rkt"
          "private/query.rkt"
@@ -105,4 +111,5 @@
          "private/to-sql.rkt"
          "private/fancy-select.rkt"
          "private/creates-and-updates.rkt"
-         "private/grouping-v2.rkt")
+         "private/grouping-v2.rkt"
+         "private/delete.rkt")

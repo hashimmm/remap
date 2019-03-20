@@ -5,13 +5,15 @@
 (require racket/string
          "tables.rkt"
          "query.rkt"
-         "creates-and-updates.rkt")
+         "creates-and-updates.rkt"
+         "delete.rkt")
 
 (define-type SQL-Clause (U Query
                            PreparedQuery
                            LiteralQuery
                            PreparedInsert
-                           PreparedUpdate))
+                           PreparedUpdate
+                           PreparedDelete))
 
 (: to-sql (-> SQL-Clause String))
 (define (to-sql sql-clause)
@@ -61,6 +63,19 @@
          (format "UPDATE ~a SET ~a~a"
                  rendered-tbl-name
                  rendered-update-clauses
+                 rendered-where)]
+        [(PreparedDelete? sql-clause)
+         (define pd sql-clause)
+         (define rendered-tbl-name
+           (render-tbl-name (PreparedDelete-table pd)))
+         (define where (PreparedDelete-where pd))
+         (define rendered-where
+           (if where
+               (format "~nWHERE ~a"
+                       (render-sel where '()))
+               ""))
+         (format "DELETE FROM ~a~a"
+                 rendered-tbl-name
                  rendered-where)]
         [else
          (define pq sql-clause)
