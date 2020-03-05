@@ -52,7 +52,7 @@
   (BaseFunc<%> A FuncAnyParam))
 
 (define-type BoolFunc<%> (Func<%> BooleanColumn))
-(define-type AnyFunc<%> (Func<%> ColIdent))
+(define-type AnyFunc<%> (BaseFunc<%> ColIdent FuncAnyParam))
 
 (define-type BoolFunc
   (Instance
